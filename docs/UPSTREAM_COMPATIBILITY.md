@@ -39,7 +39,9 @@ an explicitly matching `CM0_SDK_SHA256` value.
   containing `bq27220`/`bq27`, matching the board gauge shipped by the official
   overlays. Zero SDR follows that selection rule for its title bar, requires a
   present battery and valid 0–100% capacity, and regression-tests the choice
-  against a competing USB battery plus Wi-Fi/Ethernet sysfs fixtures.
+  against a competing USB battery plus Wi-Fi/Ethernet sysfs fixtures. The P0
+  runner also applies the Launcher's voltage/current/temperature ranges and
+  records those four board-power measurements with every resource sample.
 - APPLaunch gives an external application exclusive framebuffer ownership and
   resumes after it exits. Zero SDR handles Esc normally and handles `SIGINT` and
   `SIGTERM` through the same clean receiver/audio shutdown path.

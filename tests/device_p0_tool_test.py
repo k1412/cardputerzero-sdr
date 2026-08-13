@@ -51,7 +51,7 @@ package=""
 for package do :; done
 case "$package" in
     cardputerzero-sdr)
-        printf 'install ok installed 0.1.0-7 arm64'
+        printf 'install ok installed 0.1.0-8 arm64'
         ;;
     librtlsdr0)
         [ "${FAKE_RTL_PACKAGE_MISSING:-0}" = 0 ] || exit 1
@@ -145,6 +145,22 @@ esac
         write(proc_root / "meminfo", "MemTotal: 1024000 kB\nMemAvailable: 512000 kB\n")
         write(sys_root / "class/thermal/thermal_zone0/type", "cpu\n")
         write(sys_root / "class/thermal/thermal_zone0/temp", "42000\n")
+        generic_battery = sys_root / "class/power_supply/aaa-usb-pack"
+        write(generic_battery / "type", "Battery\n")
+        write(generic_battery / "present", "1\n")
+        write(generic_battery / "capacity", "44\n")
+        write(generic_battery / "status", "Discharging\n")
+        write(generic_battery / "voltage_now", "3700000\n")
+        write(generic_battery / "current_now", "-90000\n")
+        write(generic_battery / "temp", "250\n")
+        battery = sys_root / "class/power_supply/bq27220-0"
+        write(battery / "type", "Battery\n")
+        write(battery / "present", "1\n")
+        write(battery / "capacity", "81\n")
+        write(battery / "status", "Charging\n")
+        write(battery / "voltage_now", "4100123\n")
+        write(battery / "current_instant", "125500\n")
+        write(battery / "temp", "273\n")
 
         environment = dict(os.environ)
         environment.pop("LV_LINUX_FBDEV_DEVICE", None)
@@ -170,7 +186,7 @@ esac
         )
         assert result.returncode == 0, result.stdout + result.stderr
         report = (output / "preflight.txt").read_text(encoding="utf-8")
-        assert "schema=zero-sdr-p0-v4" in report
+        assert "schema=zero-sdr-p0-v5" in report
         assert "preflight=PASS" in report
         assert "os_id=debian" in report
         assert "os_version=13" in report
@@ -179,7 +195,7 @@ esac
         assert "plugdev_membership=present" in report
         assert "launcher_service=active" in report
         assert "app_processes=0" in report
-        assert "package=install ok installed 0.1.0-7 arm64" in report
+        assert "package=install ok installed 0.1.0-8 arm64" in report
         assert "rtl_runtime_package=install ok installed 2.0.2-2+b1 arm64" in report
         assert f"rtl_udev_rule=valid path={udev_rule}" in report
         assert "framebuffer_virtual_size=320,170" in report
@@ -188,6 +204,13 @@ esac
         assert "rtl_devices=1 accessible=1 high_speed=1" in report
         assert "rtl_usb=0bda:2832" in report
         assert "alsa_playback_nodes=1 accessible=1" in report
+        assert "battery_supply=bq27220-0" in report
+        assert "battery_present=1" in report
+        assert "battery_capacity_percent=81" in report
+        assert "battery_status=Charging" in report
+        assert "battery_voltage_uv=4100123" in report
+        assert "battery_current_ua=125500" in report
+        assert "battery_temp_tenths_c=273" in report
         assert "SECRET-SERIAL-MUST-NOT-LEAK" not in report
         assert "hostname=" not in report
         assert output.stat().st_mode & 0o777 == 0o700
@@ -290,6 +313,24 @@ esac
         assert "preflight=FAIL" in missing_overlay_report
         write(boot_config, "dtoverlay=cardputerzero-v5-overlay\n")
 
+        write(battery / "present", "0\n")
+        missing_battery_output = root / "missing-battery-evidence"
+        result = subprocess.run(
+            [tool, "--preflight-only", "--output", str(missing_battery_output)],
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        missing_battery_report = (
+            missing_battery_output / "preflight.txt"
+        ).read_text(encoding="utf-8")
+        assert "battery_supply=bq27220-0" in missing_battery_report
+        assert "battery_present=0" in missing_battery_report
+        assert "preflight=FAIL" in missing_battery_report
+        write(battery / "present", "1\n")
+
         missing_dependency_environment = dict(environment)
         missing_dependency_environment["FAKE_RTL_PACKAGE_MISSING"] = "1"
         missing_dependency_output = root / "missing-dependency-evidence"
@@ -371,7 +412,7 @@ esac
         assert result.returncode == 1, result.stdout + result.stderr
         short_result = (short_output / "result.txt").read_text(encoding="utf-8")
         assert "duration_complete=0" in short_result
-        assert "schema=zero-sdr-p0-result-v2" in short_result
+        assert "schema=zero-sdr-p0-result-v3" in short_result
         assert "sample_interval_seconds=1" in short_result
         assert "app_exit_status=0" in short_result
         assert "forced_kill=0" in short_result

@@ -21,6 +21,8 @@ FIELD_PATTERN = re.compile(r"\b([a-z_]+)=([0-9]+)\b")
 RESOURCE_FIELDS = [
     "epoch", "pid", "state", "elapsed_s", "cpu_percent", "rss_kib",
     "vsz_kib", "mem_available_kib", "max_temp_millic",
+    "battery_capacity_percent", "battery_voltage_uv", "battery_current_ua",
+    "battery_temp_tenths_c",
 ]
 MONOTONIC_FIELDS = {
     "uptime_ms", "ui_loops", "max_ui_gap_ms", "connection_attempts",
@@ -73,6 +75,10 @@ def integer_value(values: dict[str, str], key: str) -> int | None:
         return None
 
 
+def integer_in_range(value: int | None, minimum: int, maximum: int) -> bool:
+    return value is not None and minimum <= value <= maximum
+
+
 def load_resource_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
     with path.open(encoding="utf-8", errors="replace", newline="") as stream:
         reader = csv.DictReader(stream)
@@ -105,8 +111,22 @@ def p0_evidence_checks(evidence_dir: Path,
     except OSError:
         preflight_text = ""
         preflight = {}
+    battery_capacity = integer_value(preflight, "battery_capacity_percent")
+    battery_voltage = integer_value(preflight, "battery_voltage_uv")
+    battery_current = integer_value(preflight, "battery_current_ua")
+    battery_temp = integer_value(preflight, "battery_temp_tenths_c")
+    battery_preflight_ok = (
+        "bq27" in preflight.get("battery_supply", "") and
+        preflight.get("battery_present") == "1" and
+        integer_in_range(battery_capacity, 0, 100) and
+        integer_in_range(battery_voltage, 0, 20_000_000) and
+        integer_in_range(battery_current, -5_000_499, 5_000_499) and
+        integer_in_range(battery_temp, -400, 1_000) and
+        preflight.get("battery_status") in
+        {"Charging", "Discharging", "Not charging", "Full"}
+    )
     checks.extend([
-        (preflight.get("schema") == "zero-sdr-p0-v4",
+        (preflight.get("schema") == "zero-sdr-p0-v5",
          "recognized P0 preflight schema"),
         (preflight.get("preflight") == "PASS",
          "device preflight passed"),
@@ -133,6 +153,8 @@ def p0_evidence_checks(evidence_dir: Path,
          "RTL-SDR runtime package was installed"),
         (preflight.get("rtl_udev_rule", "").startswith("valid path="),
          "distribution RTL-SDR udev rule was valid"),
+        (battery_preflight_ok,
+         "Cardputer BQ battery telemetry passed preflight"),
         ("hostname=" not in preflight_text and
          "serial=" not in preflight_text and
          "network=" not in preflight_text,
@@ -169,7 +191,7 @@ def p0_evidence_checks(evidence_dir: Path,
         snapshots[-1].get("uptime_ms", 0) >= requested_seconds * 1000
     )
     checks.extend([
-        (result.get("schema") == "zero-sdr-p0-result-v2",
+        (result.get("schema") == "zero-sdr-p0-result-v3",
          "recognized P0 result schema"),
         (requested_seconds is not None and
          requested_seconds >= P0_RUNTIME_SECONDS,
@@ -205,6 +227,10 @@ def p0_evidence_checks(evidence_dir: Path,
     elapsed_values: list[int] = []
     resource_values_ok = resource_shape_ok
     pids: set[int] = set()
+    battery_capacities: list[int] = []
+    battery_voltages: list[int] = []
+    battery_currents: list[int] = []
+    battery_temperatures: list[int] = []
     if resource_shape_ok:
         try:
             for row in resource_rows:
@@ -217,10 +243,32 @@ def p0_evidence_checks(evidence_dir: Path,
                     int(row["mem_available_kib"])
                 if row["max_temp_millic"] != "unknown":
                     int(row["max_temp_millic"])
+                battery_capacities.append(int(row["battery_capacity_percent"]))
+                battery_voltages.append(int(row["battery_voltage_uv"]))
+                battery_currents.append(int(row["battery_current_ua"]))
+                battery_temperatures.append(int(row["battery_temp_tenths_c"]))
                 if row["state"].startswith("Z"):
                     resource_values_ok = False
         except (KeyError, TypeError, ValueError):
             resource_values_ok = False
+    battery_samples_ok = (
+        len(battery_capacities) == len(resource_rows) > 0 and
+        all(0 <= value <= 100 for value in battery_capacities) and
+        all(0 <= value <= 20_000_000 for value in battery_voltages) and
+        all(-5_000_499 <= value <= 5_000_499 for value in battery_currents) and
+        all(-400 <= value <= 1_000 for value in battery_temperatures)
+    )
+    if battery_samples_ok:
+        battery_description = (
+            "continuous board-battery telemetry is valid "
+            f"(capacity {min(battery_capacities)}-{max(battery_capacities)}%, "
+            f"voltage {min(battery_voltages) / 1000:.0f}-"
+            f"{max(battery_voltages) / 1000:.0f} mV, "
+            f"current {min(battery_currents) / 1000:.0f}-"
+            f"{max(battery_currents) / 1000:.0f} mA)"
+        )
+    else:
+        battery_description = "continuous board-battery telemetry is valid"
     resource_monotonic = (
         bool(elapsed_values) and
         elapsed_values == sorted(elapsed_values) and
@@ -242,6 +290,7 @@ def p0_evidence_checks(evidence_dir: Path,
         (resource_shape_ok, "resource CSV has the expected schema and samples"),
         (resource_values_ok and resource_monotonic,
          "resource samples are valid, ordered, and belong to one process"),
+        (battery_samples_ok, battery_description),
         (resource_coverage,
          "resource samples cover the requested run"),
         (sample_count_ok,

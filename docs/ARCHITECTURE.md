@@ -51,7 +51,7 @@ The receiver worker must never call LVGL. It publishes bounded frames to the mai
 
 `RadioSession` maintains cumulative lock-free counters for connection attempts, retries, RF reads, audio queue/output health, and DSP processing time. The UI thread snapshots these atomics and emits a flushed, timestamped `diagnostics` record every 30 seconds together with UI-loop cadence. No metrics path calls LVGL from the worker or blocks the receiver on filesystem I/O. For P0, `scripts/summarize_diagnostics.py` cross-checks that log against the preflight, runner result, APPLaunch transition, and process resource timeline instead of accepting an isolated log as release evidence.
 
-The application converts `SIGINT` and `SIGTERM` into a main-loop stop request, then unwinds screen, receiver, audio, and device ownership normally; the signal handler itself only writes a `sig_atomic_t`. The packaged `cardputerzero-sdr-p0` runner uses that path after a bounded device session. It gathers only release-relevant display/input/RTL-SDR/audio/resource facts, rejects root execution, and deliberately omits hostname, networking, and USB serials from shareable evidence.
+The application converts `SIGINT` and `SIGTERM` into a main-loop stop request, then unwinds screen, receiver, audio, and device ownership normally; the signal handler itself only writes a `sig_atomic_t`. The packaged `cardputerzero-sdr-p0` runner uses that path after a bounded device session. It gathers only release-relevant display/input/RTL-SDR/audio/resource facts plus continuous board-battery capacity/voltage/current/temperature, rejects root execution, and deliberately omits hostname, networking, and USB serials from shareable evidence.
 
 ## Threading and memory rules
 

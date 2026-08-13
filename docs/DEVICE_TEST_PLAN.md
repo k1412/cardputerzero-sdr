@@ -23,7 +23,7 @@ This establishes the dongle baseline only. It does not prove Cardputer Zero USB-
 | Display | Inspect radio/settings in dark and light themes; repeat once with the framebuffer path exported by APPLaunch | selected path and native 320×170 mode are logged; no clipping, tearing, overlays, or unreadable text | Pending device |
 | Keys | Exercise F/X/Z/C, Enter, Esc, G/M/L/T, number row, period, Backspace, and hold-to-repeat | one action per press; repeat is controlled; Esc returns safely | Pending device |
 | USB discovery | Cold boot, hot-plug, unplug/replug RTL2832U | installed `librtlsdr0`, valid distro rule, `plugdev` membership, at least 480 Mb/s link, and read-write node; state changes without crash; UI stays responsive | Pending device |
-| USB power | Capture continuously with screen/audio active | no brownout, disconnect loop, or thermal warning | Pending device |
+| USB power | Capture continuously with screen/audio active | BQ27220/BQ27 capacity/voltage/current/temperature samples remain readable and within the official driver ranges; no brownout, disconnect loop, or thermal warning | Pending device |
 | Tuning | Test 22.0, 97.4, and 948.6 MHz by stepping and direct entry; try 21.999/948.601 | valid values tune exactly; invalid values are rejected; no overflow/wrap | Pending device |
 | RF capture | Run 2.048 MS/s for 30 minutes and summarize the structured log | no read errors/reconnects; IQ throughput within 10% of 4,096,000 bytes/s | Pending device |
 | WFM audio | Receive a known station, mute/unmute, unplug device | intelligible audio; no loud transient; mute is immediate | Pending device |
@@ -51,7 +51,7 @@ Run this separately from hot-plug and failure-injection tests so intentional rec
 cardputerzero-sdr-p0 --preflight-only
 ```
 
-The preflight must report `schema=zero-sdr-p0-v4` and `preflight=PASS`. Confirm a non-empty `device_model`, one of the official `cardputerzero-overlay`, `cardputerzero-v3-overlay`, or `cardputerzero-v5-overlay` values, `app_processes=0`, `launcher_service=active` or `inactive`, `plugdev_membership=present`, both package records are installed ARM64 builds, `rtl_udev_rule=valid`, and at least one accessible RTL-SDR reports `high_speed=1`; then inspect its framebuffer, input-event, USB-node, and ALSA facts rather than bypassing a failure with root. Keep audio unmuted on a known WFM station, then start the evidence run and exercise the physical controls while it remains active:
+The preflight must report `schema=zero-sdr-p0-v5` and `preflight=PASS`. Confirm a non-empty `device_model`, one of the official `cardputerzero-overlay`, `cardputerzero-v3-overlay`, or `cardputerzero-v5-overlay` values, `app_processes=0`, `launcher_service=active` or `inactive`, `plugdev_membership=present`, both package records are installed ARM64 builds, `rtl_udev_rule=valid`, an enumerated and present BQ27220/BQ27 board battery with valid capacity/voltage/current/temperature/status, and at least one accessible RTL-SDR reporting `high_speed=1`; then inspect its framebuffer, input-event, USB-node, and ALSA facts rather than bypassing a failure with root. Keep audio unmuted on a known WFM station, then start the evidence run and exercise the physical controls while it remains active:
 
 ```sh
 cardputerzero-sdr-p0 --duration 1800
@@ -66,8 +66,10 @@ python3 scripts/summarize_diagnostics.py --p0 path/to/evidence
 The evaluator requires the complete directory. It cross-checks `preflight.txt`,
 `result.txt`, `resources.csv`, and `app.log`; a log copied without its launcher,
 process-exit, package/access, and resource evidence is not a valid P0 result.
-The result schema must be `zero-sdr-p0-result-v2` and record the actual resource
-sampling interval.
+The result schema must be `zero-sdr-p0-result-v3` and record the actual resource
+sampling interval. Every resource row must also contain valid board-battery
+capacity, voltage, current, and temperature values; missing telemetry invalidates
+the power evidence rather than being silently accepted as `unknown`.
 
 The expected RF input is 2.048 million complex samples/s at two unsigned bytes per sample, or 4,096,000 bytes/s. A 16,384-byte input block represents 8,192 complex samples and 4,000 µs of RF time, so average spectrum plus demodulation work must stay below 4,000 µs/block. Unmuted WFM output should approach 32,000 mono frames/s. The automated P0 evaluation requires:
 

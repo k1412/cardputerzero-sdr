@@ -38,6 +38,14 @@ is_uint() {
     esac
 }
 
+is_int() {
+    case "$1" in
+        -*) is_uint "${1#-}" ;;
+        +*) is_uint "${1#+}" ;;
+        *) is_uint "$1" ;;
+    esac
+}
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --duration)
@@ -113,6 +121,21 @@ read_trimmed() {
     fi
 }
 
+select_battery_path() {
+    preferred=""
+    fallback=""
+    for supply_path in "$sys_root"/class/power_supply/*; do
+        [ -d "$supply_path" ] || continue
+        [ "$(read_trimmed "$supply_path/type")" = Battery ] || continue
+        supply_name=${supply_path##*/}
+        case "$supply_name" in
+            *bq27220*|*bq27*) preferred=$supply_path; break ;;
+        esac
+        [ -n "$fallback" ] || fallback=$supply_path
+    done
+    printf '%s' "${preferred:-$fallback}"
+}
+
 access_text() {
     if [ ! -e "$1" ]; then
         printf 'missing'
@@ -154,7 +177,7 @@ for required_tool in awk grep ps readlink sed stat systemctl tr; do
 done
 
 {
-    echo "schema=zero-sdr-p0-v4"
+    echo "schema=zero-sdr-p0-v5"
     echo "created_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "kernel=$(uname -srmo 2>/dev/null || echo unavailable)"
     echo "os_id=$(os_value ID)"
@@ -343,6 +366,50 @@ done
         sed -n '1,20{s/^/alsa_pcm: /; p;}' "$proc_root/asound/pcm"
     fi
 
+    battery_path=$(select_battery_path)
+    battery_supply=${battery_path##*/}
+    battery_present=""
+    battery_capacity=""
+    battery_status=""
+    battery_voltage=""
+    battery_current=""
+    battery_temp=""
+    battery_current_path=""
+    if [ -n "$battery_path" ]; then
+        battery_present=$(read_trimmed "$battery_path/present")
+        battery_capacity=$(read_trimmed "$battery_path/capacity")
+        battery_status=$(read_trimmed "$battery_path/status")
+        battery_voltage=$(read_trimmed "$battery_path/voltage_now")
+        battery_current_path="$battery_path/current_instant"
+        if [ ! -r "$battery_current_path" ]; then
+            battery_current_path="$battery_path/current_now"
+        fi
+        battery_current=$(read_trimmed "$battery_current_path")
+        battery_temp=$(read_trimmed "$battery_path/temp")
+    fi
+    echo "battery_supply=${battery_supply:-missing}"
+    echo "battery_present=${battery_present:-missing}"
+    echo "battery_capacity_percent=${battery_capacity:-missing}"
+    echo "battery_status=${battery_status:-missing}"
+    echo "battery_voltage_uv=${battery_voltage:-missing}"
+    echo "battery_current_ua=${battery_current:-missing}"
+    echo "battery_temp_tenths_c=${battery_temp:-missing}"
+    case "$battery_supply" in
+        *bq27220*|*bq27*) ;;
+        *) preflight_ok=0 ;;
+    esac
+    [ "$battery_present" = 1 ] || preflight_ok=0
+    is_uint "$battery_capacity" && [ "$battery_capacity" -le 100 ] || preflight_ok=0
+    is_uint "$battery_voltage" && [ "$battery_voltage" -le 20000000 ] || preflight_ok=0
+    is_int "$battery_current" &&
+        [ "$battery_current" -ge -5000499 ] && [ "$battery_current" -le 5000499 ] || preflight_ok=0
+    is_int "$battery_temp" &&
+        [ "$battery_temp" -ge -400 ] && [ "$battery_temp" -le 1000 ] || preflight_ok=0
+    case "$battery_status" in
+        Charging|Discharging|"Not charging"|Full) ;;
+        *) preflight_ok=0 ;;
+    esac
+
     if [ -r "$proc_root/meminfo" ]; then
         awk '/^(MemTotal|MemAvailable):/ {key=$1; sub(/:$/, "", key); print "memory_" tolower(key) "=" $2 " kB"}' \
             "$proc_root/meminfo"
@@ -372,7 +439,7 @@ fi
 resources="$output/resources.csv"
 app_log="$output/app.log"
 result="$output/result.txt"
-echo "epoch,pid,state,elapsed_s,cpu_percent,rss_kib,vsz_kib,mem_available_kib,max_temp_millic" >"$resources"
+echo "epoch,pid,state,elapsed_s,cpu_percent,rss_kib,vsz_kib,mem_available_kib,max_temp_millic,battery_capacity_percent,battery_voltage_uv,battery_current_ua,battery_temp_tenths_c" >"$resources"
 
 launcher_was_active=0
 launcher_stop_status=not-needed
@@ -434,7 +501,11 @@ while kill -0 "$app_pid" 2>/dev/null; do
             max_temp=$temp
         fi
     done
-    echo "$now,$app_pid,$process_values,${mem_available:-unknown},${max_temp:-unknown}" >>"$resources"
+    battery_capacity=$(read_trimmed "$battery_path/capacity")
+    battery_voltage=$(read_trimmed "$battery_path/voltage_now")
+    battery_current=$(read_trimmed "$battery_current_path")
+    battery_temp=$(read_trimmed "$battery_path/temp")
+    echo "$now,$app_pid,$process_values,${mem_available:-unknown},${max_temp:-unknown},${battery_capacity:-unknown},${battery_voltage:-unknown},${battery_current:-unknown},${battery_temp:-unknown}" >>"$resources"
 
     if [ "$stop_requested" -eq 1 ]; then
         break
@@ -474,7 +545,7 @@ restore_launcher
 trap - 0
 
 {
-    echo "schema=zero-sdr-p0-result-v2"
+    echo "schema=zero-sdr-p0-result-v3"
     echo "started_epoch=$started_epoch"
     echo "ended_epoch=$ended_epoch"
     echo "runtime_seconds=$((ended_epoch - started_epoch))"

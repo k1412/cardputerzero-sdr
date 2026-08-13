@@ -95,7 +95,7 @@ Generate eight reproducible receiver states—offline demo, fake-device `LIVE`, 
 
 The app writes one structured `diagnostics` record to standard output every 30 seconds. Each record contains cumulative connection/retry/read-error counts, IQ blocks and bytes, audio generated/written/dropped frames, ALSA recovery/failure counts, DSP processing time, UI-loop count, and maximum UI-loop gap. Set `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` to a value from 100 to 3,600,000 when a different interval is needed.
 
-The ARM64 package installs `cardputerzero-sdr-p0`, a non-root preflight and evidence runner. Do not leave another Zero SDR instance running. From an SSH or local shell as the normal APPLaunch user, first verify the device-tree model and official Cardputer Zero overlay, installed ARM64 app and `librtlsdr0` packages, `plugdev` membership, the distribution-owned RTL-SDR rule, a USB high-speed link, native 320×170 framebuffer access, the official APPLaunch/Cardputer keyboard path, RTL-SDR USB-node access, and a writable ALSA playback node:
+The ARM64 package installs `cardputerzero-sdr-p0`, a non-root preflight and evidence runner. Do not leave another Zero SDR instance running. From an SSH or local shell as the normal APPLaunch user, first verify the device-tree model and official Cardputer Zero overlay, installed ARM64 app and `librtlsdr0` packages, `plugdev` membership, the distribution-owned RTL-SDR rule, a USB high-speed link, native 320×170 framebuffer access, the official APPLaunch/Cardputer keyboard path, RTL-SDR USB-node access, a writable ALSA playback node, and valid board BQ27220/BQ27 battery telemetry:
 
 ```sh
 cardputerzero-sdr-p0 --preflight-only
@@ -113,13 +113,13 @@ cardputerzero-sdr-p0 --duration 1800
 
 For the full run, the tool pauses an active `APPLaunch.service` through the normal user's systemd manager before it starts Zero SDR, then restores the launcher on completion, interruption, or an early app exit. This matches the launcher's exclusive-framebuffer contract without root access; the result records both transitions. The runner also refuses to start while another Zero SDR process exists.
 
-The runner creates a private evidence directory below `$XDG_STATE_HOME/cardputerzero-sdr/evidence/` (or `~/.local/state/`). It stores a sanitized hardware/access snapshot, `app.log`, process CPU/memory/temperature samples, and the exit result. It refuses root, excludes hostname/network state/USB serials, and stops the app through its tested clean `SIGTERM` path. Copy the evidence directory to a development checkout, then audit it on the development machine:
+The runner creates a private evidence directory below `$XDG_STATE_HOME/cardputerzero-sdr/evidence/` (or `~/.local/state/`). It stores a sanitized hardware/access snapshot, `app.log`, process CPU/memory/temperature samples, board-battery capacity/voltage/current/temperature samples, and the exit result. It refuses root, excludes hostname/network state/USB serials, and stops the app through its tested clean `SIGTERM` path. Copy the evidence directory to a development checkout, then audit it on the development machine:
 
 ```sh
 python3 scripts/summarize_diagnostics.py --p0 path/to/evidence
 ```
 
-The `--p0` check audits the complete evidence directory rather than trusting `app.log` alone. It validates device-tree identity, the preflight schema and privacy boundary, installed packages, absence of a concurrent app, clean app exit, APPLaunch pause/restore, diagnostic counter monotonicity, resource-sample coverage, and the 30-minute capture gates. Those gates require one uninterrupted connection, zero RF/audio errors or drops, IQ throughput within 10% of 4,096,000 bytes/s, unmuted audio output within 10% of 32,000 frames/s, and average processing below the 4,000 µs IQ-block budget. Maximum processing and UI-loop gaps are reported for the physical-device baseline but are not guessed release thresholds. See [the hardware test plan](docs/DEVICE_TEST_PLAN.md) for the complete procedure.
+The `--p0` check audits the complete evidence directory rather than trusting `app.log` alone. It validates device-tree identity, the preflight schema and privacy boundary, installed packages, absence of a concurrent app, clean app exit, APPLaunch pause/restore, diagnostic counter monotonicity, continuous board-battery telemetry, resource-sample coverage, and the 30-minute capture gates. Those gates require one uninterrupted connection, zero RF/audio errors or drops, IQ throughput within 10% of 4,096,000 bytes/s, unmuted audio output within 10% of 32,000 frames/s, and average processing below the 4,000 µs IQ-block budget. Maximum processing and UI-loop gaps are reported for the physical-device baseline but are not guessed release thresholds. See [the hardware test plan](docs/DEVICE_TEST_PLAN.md) for the complete procedure.
 
 ## Cardputer Zero build
 
@@ -129,7 +129,7 @@ The cross preset follows the official CardputerZero CMake template and downloads
 cmake --workflow --preset cp0-cross-package
 ```
 
-Expected package name: `dist/cardputerzero-sdr_0.1.0-7_arm64.deb`.
+Expected package name: `dist/cardputerzero-sdr_0.1.0-8_arm64.deb`.
 
 Do not treat a successful cross-build as device validation. Complete [the hardware test plan](docs/DEVICE_TEST_PLAN.md) before publishing a release.
 
