@@ -1,0 +1,72 @@
+name: Device Package
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: device-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  arm64-deb:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Install cross-build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+            dpkg-dev fakeroot ca-certificates git
+          python -m pip install --disable-pip-version-check "cmake>=3.31,<5" ninja
+
+      - name: Cache Cardputer Zero BSP and fetched sources
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache
+          key: cp0-bsp-v0.0.4-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', 'cmake/toolchains/cp0-aarch64-linux-gnu.cmake') }}
+          restore-keys: |
+            cp0-bsp-v0.0.4-${{ runner.os }}-
+
+      - name: Configure, build, and package
+        run: cmake --workflow --preset cp0-cross-package
+
+      - name: Inspect package
+        shell: bash
+        run: |
+          set -euo pipefail
+          package=$(find dist -maxdepth 1 -name 'cardputerzero-sdr_*.deb' -print -quit)
+          test -n "$package"
+          test "$(dpkg-deb -f "$package" Package)" = "cardputerzero-sdr"
+          test "$(dpkg-deb -f "$package" Architecture)" = "arm64"
+          dpkg-deb -c "$package" | tee /tmp/package-contents.txt
+          if grep -q '/systemd/system/' /tmp/package-contents.txt; then
+            echo "unexpected system service in package" >&2
+            exit 1
+          fi
+          grep -q '/usr/bin/cardputerzero-sdr$' /tmp/package-contents.txt
+          grep -q '/etc/cardputerzero-sdr.conf$' /tmp/package-contents.txt
+          dpkg-deb -I "$package"
+
+      - name: Upload ARM64 package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: cardputerzero-sdr-arm64-${{ github.run_id }}
+          path: dist/cardputerzero-sdr_*.deb
+          if-no-files-found: error
+          retention-days: 30

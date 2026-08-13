@@ -1,6 +1,6 @@
 {
-  "name": "template-app-simulator-on-windows",
-  "version": "1.0.0",
+  "name": "cardputerzero-sdr",
+  "version": "0.1.0",
   "dependencies": [
     "fmt",
     "libpng",

@@ -1,0 +1,67 @@
+{
+  "package_name": "cardputerzero-sdr",
+  "version": "0.1.0",
+  "app_name": "Zero SDR",
+  "bin_name": "cardputerzero-sdr",
+  "description": "Keyboard-first RTL-SDR spectrum and waterfall receiver for Cardputer Zero",
+  "store": {
+    "summary": "Tune RTL-SDR with a native spectrum, waterfall, and Cardputer keyboard controls.",
+    "description": "A Cardputer Zero-native SDR receiver UI designed for its 320×170 screen and physical keyboard. The current preview includes a deterministic offline demo; live RTL-SDR reception remains gated on device validation before the first store release.",
+    "categories": ["Tools", "Radio"],
+    "screenshots": [
+      "screenshots/radio-dark.png",
+      "screenshots/settings-dark.png",
+      "screenshots/settings-zh-cn.png"
+    ],
+    "icon": "packaging/icon.png",
+    "license": "MIT",
+    "source_repo": "https://github.com/k1412/cardputerzero-sdr",
+    "author": {
+      "github": "k1412"
+    },
+    "permissions": [
+      "audio",
+      "keyboard_input",
+      "filesystem",
+      "external_hardware"
+    ],
+    "locales": {
+      "zh-CN": {
+        "title": "Zero SDR",
+        "summary": "用 Cardputer 键盘调谐 RTL-SDR，并查看频谱与瀑布图。"
+      },
+      "zh-TW": {
+        "title": "Zero SDR",
+        "summary": "用 Cardputer 鍵盤調諧 RTL-SDR，並查看頻譜與瀑布圖。"
+      },
+      "es": {
+        "title": "Zero SDR",
+        "summary": "Sintoniza RTL-SDR con espectro, cascada y teclado Cardputer."
+      },
+      "ja": {
+        "title": "Zero SDR",
+        "summary": "Cardputer キーボードで RTL-SDR を選局し、スペクトラムとウォーターフォールを表示。"
+      },
+      "ko": {
+        "title": "Zero SDR",
+        "summary": "Cardputer 키보드로 RTL-SDR을 조정하고 스펙트럼과 워터폴을 확인하세요."
+      },
+      "fr": {
+        "title": "Zero SDR",
+        "summary": "Réglez RTL-SDR avec le clavier Cardputer, spectre et chute d’eau."
+      },
+      "de": {
+        "title": "Zero SDR",
+        "summary": "RTL-SDR per Cardputer-Tastatur mit Spektrum und Wasserfall abstimmen."
+      },
+      "pt-BR": {
+        "title": "Zero SDR",
+        "summary": "Sintonize RTL-SDR pelo teclado Cardputer com espectro e waterfall."
+      },
+      "ru": {
+        "title": "Zero SDR",
+        "summary": "Настройка RTL-SDR с клавиатуры Cardputer, спектр и водопад."
+      }
+    }
+  }
+}

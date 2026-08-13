@@ -8,6 +8,7 @@
 
 #include "navbar.h"
 #include "base_viewmodel.h"
+#include "linux_input.h"
 #include "titlebar.h"
 #include "lvgl.h"
 
@@ -32,11 +33,14 @@ public:
 
 protected:
     virtual void build_content(lv_obj_t* content) = 0;
+    virtual void handle_key(platform::AppKey key, bool repeated) = 0;
 
     viewmodel::BaseViewModel& view_model();
     app::AssetManager& assets();
 
 private:
+    static void app_key_handler(platform::AppKey key, bool repeated, void* user_data);
+
     viewmodel::BaseViewModel& view_model_;
     app::AssetManager& assets_;
     lv_obj_t* root_{nullptr};

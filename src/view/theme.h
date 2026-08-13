@@ -12,8 +12,8 @@ namespace view {
 
 constexpr int kScreenWidth    = 320;
 constexpr int kScreenHeight   = 170;
-constexpr int kTitleBarHeight = 30;
-constexpr int kNavBarHeight   = 30;
+constexpr int kTitleBarHeight = 24;
+constexpr int kNavBarHeight   = 26;
 
 struct ThemePalette {
     lv_color_t background;

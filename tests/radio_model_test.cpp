@@ -1,0 +1,43 @@
+// SPDX-License-Identifier: MIT
+
+#include "radio_model.h"
+
+#include <cassert>
+
+int main() {
+    model::RadioModel radio;
+    assert(radio.frequency_hz() == model::RadioModel::kDefaultFrequencyHz);
+    assert(radio.tuning_step_hz() == 200'000);
+
+    radio.tune(1);
+    assert(radio.frequency_hz() == 97'600'000);
+    radio.tune(-1);
+    assert(radio.frequency_hz() == model::RadioModel::kDefaultFrequencyHz);
+
+    radio.set_frequency_hz(0);
+    assert(radio.frequency_hz() == model::RadioModel::kMinimumFrequencyHz);
+    radio.tune(-1);
+    assert(radio.frequency_hz() == model::RadioModel::kMinimumFrequencyHz);
+
+    radio.set_frequency_hz(UINT32_MAX);
+    assert(radio.frequency_hz() == model::RadioModel::kMaximumFrequencyHz);
+    radio.tune(1);
+    assert(radio.frequency_hz() == model::RadioModel::kMaximumFrequencyHz);
+
+    radio.set_tuning_step_index(99);
+    assert(radio.tuning_step_hz() == 1'000'000);
+    radio.cycle_tuning_step(1);
+    assert(radio.tuning_step_hz() == 10'000);
+    radio.cycle_tuning_step(-1);
+    assert(radio.tuning_step_hz() == 1'000'000);
+
+    assert(radio.automatic_gain());
+    radio.adjust_gain(1);
+    assert(!radio.automatic_gain());
+    assert(radio.gain_tenths_db() == 210);
+
+    radio.toggle_page();
+    assert(radio.current_page() == model::AppPage::Settings);
+    radio.cycle_locale(10, -1);
+    assert(radio.locale_index() == 9);
+}

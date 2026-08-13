@@ -6,6 +6,9 @@
 
 #include "base_viewmodel.h"
 
+#include <array>
+#include <cstdio>
+
 namespace viewmodel {
 namespace {
 
@@ -16,13 +19,16 @@ int page_to_int(model::AppPage page) {
 } // namespace
 
 BaseViewModel::BaseViewModel()
-    : title_subject_(model_.app_title()),
-      greeting_subject_(model_.greeting()),
+    : title_subject_("Zero SDR"),
+      frequency_subject_("97.400"),
+      source_subject_("DEMO"),
+      gain_subject_("AUTO GAIN"),
+      step_subject_("200 kHz"),
+      locale_name_subject_("English"),
+      muted_subject_(model_.muted()),
       dark_mode_subject_(model_.dark_mode()),
       current_page_subject_(page_to_int(model_.current_page())),
-      counter_subject_(0),
-      bold_text_subject_(false),
-      info_visible_subject_(false),
+      locale_subject_(static_cast<int>(model_.locale_index())),
       quit_requested_subject_(false) {}
 
 BaseViewModel::~BaseViewModel() = default;
@@ -31,8 +37,28 @@ lv_subject_t* BaseViewModel::title_subject() {
     return title_subject_.native();
 }
 
-lv_subject_t* BaseViewModel::greeting_subject() {
-    return greeting_subject_.native();
+lv_subject_t* BaseViewModel::frequency_subject() {
+    return frequency_subject_.native();
+}
+
+lv_subject_t* BaseViewModel::source_subject() {
+    return source_subject_.native();
+}
+
+lv_subject_t* BaseViewModel::gain_subject() {
+    return gain_subject_.native();
+}
+
+lv_subject_t* BaseViewModel::step_subject() {
+    return step_subject_.native();
+}
+
+lv_subject_t* BaseViewModel::locale_name_subject() {
+    return locale_name_subject_.native();
+}
+
+lv_subject_t* BaseViewModel::muted_subject() {
+    return muted_subject_.native();
 }
 
 lv_subject_t* BaseViewModel::dark_mode_subject() {
@@ -43,16 +69,8 @@ lv_subject_t* BaseViewModel::current_page_subject() {
     return current_page_subject_.native();
 }
 
-lv_subject_t* BaseViewModel::counter_subject() {
-    return counter_subject_.native();
-}
-
-lv_subject_t* BaseViewModel::bold_text_subject() {
-    return bold_text_subject_.native();
-}
-
-lv_subject_t* BaseViewModel::info_visible_subject() {
-    return info_visible_subject_.native();
+lv_subject_t* BaseViewModel::locale_subject() {
+    return locale_subject_.native();
 }
 
 lv_subject_t* BaseViewModel::quit_requested_subject() {
@@ -77,13 +95,13 @@ model::AppPage BaseViewModel::current_page() const {
     return model_.current_page();
 }
 
-void BaseViewModel::show_apple_page() {
-    model_.set_current_page(model::AppPage::Apple);
+void BaseViewModel::show_radio_page() {
+    model_.set_current_page(model::AppPage::Radio);
     publish_all();
 }
 
-void BaseViewModel::show_butter_page() {
-    model_.set_current_page(model::AppPage::Butter);
+void BaseViewModel::show_settings_page() {
+    model_.set_current_page(model::AppPage::Settings);
     publish_all();
 }
 
@@ -92,32 +110,116 @@ void BaseViewModel::toggle_page() {
     publish_all();
 }
 
-void BaseViewModel::increment_counter() {
-    counter_subject_.set(counter_subject_.value() + 1);
+void BaseViewModel::tune(int direction) {
+    model_.tune(direction);
+    publish_radio_state();
 }
 
-void BaseViewModel::decrement_counter() {
-    const auto next = counter_subject_.value() - 1;
-    counter_subject_.set(next < 0 ? 0 : next);
+void BaseViewModel::cycle_tuning_step(int direction) {
+    model_.cycle_tuning_step(direction);
+    publish_radio_state();
 }
 
-void BaseViewModel::toggle_bold_text() {
-    bold_text_subject_.toggle();
+void BaseViewModel::toggle_gain_mode() {
+    model_.toggle_gain_mode();
+    publish_radio_state();
 }
 
-void BaseViewModel::toggle_info() {
-    info_visible_subject_.toggle();
+void BaseViewModel::adjust_gain(int direction) {
+    model_.adjust_gain(direction);
+    publish_radio_state();
+}
+
+void BaseViewModel::toggle_muted() {
+    model_.toggle_muted();
+    publish_radio_state();
+}
+
+void BaseViewModel::cycle_locale(int direction) {
+    model_.cycle_locale(i18n::kLocaleCount, direction);
+    publish_locale_state();
+    publish_radio_state();
+}
+
+void BaseViewModel::set_locale(i18n::Locale locale) {
+    model_.set_locale_index(static_cast<size_t>(locale), i18n::kLocaleCount);
+    publish_locale_state();
+    publish_radio_state();
 }
 
 void BaseViewModel::request_quit() {
     quit_requested_subject_.set(true);
 }
 
+uint32_t BaseViewModel::frequency_hz() const {
+    return model_.frequency_hz();
+}
+
+bool BaseViewModel::is_muted() const {
+    return model_.muted();
+}
+
+i18n::Locale BaseViewModel::locale() const {
+    return static_cast<i18n::Locale>(model_.locale_index());
+}
+
+const char* BaseViewModel::text(i18n::Text key) const {
+    return i18n::translate(locale(), key);
+}
+
+const char* BaseViewModel::locale_font_asset() const {
+    return i18n::locale_info(locale()).font_asset;
+}
+
+dsp::SpectrumFrame BaseViewModel::next_spectrum_frame() {
+    return synthetic_spectrum_.next(model_.frequency_hz());
+}
+
 void BaseViewModel::publish_all() {
-    title_subject_.set(model_.app_title());
-    greeting_subject_.set(model_.greeting());
     dark_mode_subject_.set(model_.dark_mode());
     current_page_subject_.set(page_to_int(model_.current_page()));
+    publish_locale_state();
+    publish_radio_state();
+}
+
+void BaseViewModel::publish_radio_state() {
+    std::array<char, 32> buffer{};
+    const auto mhz = model_.frequency_hz() / 1'000'000U;
+    const auto khz = (model_.frequency_hz() % 1'000'000U) / 1'000U;
+    std::snprintf(buffer.data(), buffer.size(), "%u.%03u", mhz, khz);
+    frequency_subject_.set(buffer.data());
+
+    switch (model_.source_state()) {
+        case model::SourceState::Demo: source_subject_.set(text(i18n::Text::Demo)); break;
+        case model::SourceState::Connecting: source_subject_.set(text(i18n::Text::Connecting)); break;
+        case model::SourceState::Live: source_subject_.set(text(i18n::Text::Live)); break;
+        case model::SourceState::Missing: source_subject_.set(text(i18n::Text::DeviceMissing)); break;
+        case model::SourceState::Error: source_subject_.set(text(i18n::Text::DeviceError)); break;
+    }
+
+    if (model_.automatic_gain()) {
+        gain_subject_.set(text(i18n::Text::GainAuto));
+    }
+    else {
+        std::snprintf(buffer.data(), buffer.size(), "%.1f dB", model_.gain_tenths_db() / 10.0);
+        gain_subject_.set(buffer.data());
+    }
+
+    const auto step = model_.tuning_step_hz();
+    if (step >= 1'000'000U) {
+        std::snprintf(buffer.data(), buffer.size(), "%u MHz", step / 1'000'000U);
+    }
+    else {
+        std::snprintf(buffer.data(), buffer.size(), "%u kHz", step / 1'000U);
+    }
+    step_subject_.set(buffer.data());
+    muted_subject_.set(model_.muted());
+}
+
+void BaseViewModel::publish_locale_state() {
+    title_subject_.set(text(i18n::Text::AppTitle));
+    locale_subject_.set(static_cast<int>(model_.locale_index()));
+    locale_name_subject_.set(i18n::locale_info(locale()).native_name);
 }
 
 } // namespace viewmodel

@@ -6,7 +6,7 @@
 
 cmake_minimum_required(VERSION 3.31)
 
-project(cardputerzero-sdr VERSION 0.2.0 LANGUAGES C CXX)
+project(cardputerzero-sdr VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,7 +20,7 @@ set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 set(USE_DESKTOP ON CACHE BOOL "Build the desktop emulator target with LVGL SDL support")
 set(APP_NAME "${PROJECT_NAME}" CACHE STRING "Application name used for installed asset lookup")
 set(APP_ASSETS_ROOT "" CACHE PATH "Optional runtime assets root. Expected subdirectories include fonts/")
-set(APP_CONFIG_FILE "" CACHE FILEPATH "Application config file; defaults to the repository file on desktop and /etc/template-app.conf on device")
+set(APP_CONFIG_FILE "" CACHE FILEPATH "Application config file; defaults to the repository file on desktop and /etc/cardputerzero-sdr.conf on device")
 set(APP_KEY_INPUT_DEVICE "" CACHE STRING "Optional Linux evdev keyboard/keypad device path, e.g. /dev/input/event0")
 set(APP_FRAMEBUFFER_DEVICE "/dev/fb0" CACHE STRING "Linux framebuffer device path used by embedded builds")
 set(APP_DRM_DEVICE "/dev/dri/card0" CACHE STRING "Linux DRM device path used when APP_USE_DRM=ON")
@@ -33,9 +33,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compile_commands.json" F
 
 if(NOT APP_CONFIG_FILE)
     if(USE_DESKTOP)
-        set(APP_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/config/template-app.conf")
+        set(APP_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/config/cardputerzero-sdr.conf")
     else()
-        set(APP_CONFIG_FILE "/etc/template-app.conf")
+        set(APP_CONFIG_FILE "/etc/cardputerzero-sdr.conf")
     endif()
 endif()
 
@@ -106,7 +106,20 @@ if(USE_DESKTOP)
     # =========================
     # fmt
     # =========================
-    find_package(fmt CONFIG REQUIRED)
+    find_package(fmt CONFIG QUIET)
+    if(NOT TARGET fmt::fmt)
+        message(STATUS "System fmt not found; fetching the pinned source release")
+        FetchContent_Declare(
+            fmt
+            GIT_REPOSITORY https://github.com/fmtlib/fmt.git
+            GIT_TAG        12.1.0
+            GIT_SHALLOW    TRUE
+        )
+        set(FMT_INSTALL OFF CACHE BOOL "Disable fmt install rules for app packages" FORCE)
+        set(FMT_TEST OFF CACHE BOOL "Disable fmt tests" FORCE)
+        set(FMT_DOC OFF CACHE BOOL "Disable fmt docs" FORCE)
+        FetchContent_MakeAvailable(fmt)
+    endif()
 
     # =========================
     # ZLIB
@@ -434,6 +447,10 @@ target_link_libraries(${PROJECT_NAME}_platform
 file(GLOB_RECURSE MODEL_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/*.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/model/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/*.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/i18n/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/i18n/*.cpp"
 )
 
 add_library(${PROJECT_NAME}_model
@@ -444,6 +461,8 @@ add_library(${PROJECT_NAME}_model
 target_include_directories(${PROJECT_NAME}_model
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/src/model"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/dsp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/i18n"
 )
 
 # ====================================================
@@ -491,6 +510,8 @@ target_include_directories(${PROJECT_NAME}_view
         ${CMAKE_CURRENT_SOURCE_DIR}/src/reactive
         ${CMAKE_CURRENT_SOURCE_DIR}/src/viewmodel
         ${CMAKE_CURRENT_SOURCE_DIR}/src/model
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/i18n
         ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
 )
 
@@ -518,6 +539,8 @@ target_include_directories(${PROJECT_NAME}_viewmodel
     PUBLIC
         "${CMAKE_CURRENT_SOURCE_DIR}/src/viewmodel/"
         "${CMAKE_CURRENT_SOURCE_DIR}/src/model"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/dsp"
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/i18n"
         ${LVGL_INCLUDE_DIR}
 )
 
@@ -577,6 +600,8 @@ target_include_directories(${PROJECT_NAME}_core
         ${CMAKE_CURRENT_SOURCE_DIR}/src/view/widgets
         ${CMAKE_CURRENT_SOURCE_DIR}/src/viewmodel
         ${CMAKE_CURRENT_SOURCE_DIR}/src/model
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/i18n
         ${CMAKE_CURRENT_SOURCE_DIR}/src/platform
 )
 
@@ -628,6 +653,21 @@ target_link_libraries(${PROJECT_NAME}
         ${PROJECT_NAME}_view
         ${PROJECT_NAME}_viewmodel
 )
+
+include(CTest)
+if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
+    add_executable(radio_model_test tests/radio_model_test.cpp)
+    target_link_libraries(radio_model_test PRIVATE ${PROJECT_NAME}_model)
+    add_test(NAME radio_model COMMAND radio_model_test)
+
+    add_executable(synthetic_spectrum_test tests/synthetic_spectrum_test.cpp)
+    target_link_libraries(synthetic_spectrum_test PRIVATE ${PROJECT_NAME}_model)
+    add_test(NAME synthetic_spectrum COMMAND synthetic_spectrum_test)
+
+    add_executable(translations_test tests/translations_test.cpp)
+    target_link_libraries(translations_test PRIVATE ${PROJECT_NAME}_model)
+    add_test(NAME translations COMMAND translations_test)
+endif()
 
 # Package deb
 include(cmake/cm0-package.cmake)

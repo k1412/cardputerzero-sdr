@@ -25,6 +25,8 @@ std::array<lv_obj_t*, kNavKeyCount> nav_buttons{};
 uint32_t last_key = 0;
 bool last_key_pressed = false;
 bool nav_shortcut_mode = false;
+AppKeyHandler app_key_handler = nullptr;
+void* app_key_user_data = nullptr;
 
 #if !USE_DESKTOP
 struct EvdevKeypad {
@@ -34,8 +36,62 @@ struct EvdevKeypad {
     bool router_event_pending{false};
     uint32_t router_key{0};
     bool router_pressed{false};
+    bool router_repeated{false};
 };
 #endif
+
+void dispatch_nav_key(uint32_t key);
+
+AppKey normalize_app_key(uint32_t key) {
+    switch (key) {
+        case LV_KEY_UP:
+        case 'f':
+        case 'F':
+            return AppKey::Up;
+        case LV_KEY_DOWN:
+        case 'x':
+        case 'X':
+            return AppKey::Down;
+        case LV_KEY_LEFT:
+        case 'z':
+        case 'Z':
+            return AppKey::Left;
+        case LV_KEY_RIGHT:
+        case 'c':
+        case 'C':
+            return AppKey::Right;
+        case LV_KEY_ENTER:
+            return AppKey::Confirm;
+        case LV_KEY_ESC:
+            return AppKey::Back;
+        case 'g':
+        case 'G':
+            return AppKey::Gain;
+        case 'm':
+        case 'M':
+            return AppKey::Mute;
+        case 'l':
+        case 'L':
+            return AppKey::Language;
+        case 't':
+        case 'T':
+            return AppKey::Theme;
+        default:
+            return AppKey::None;
+    }
+}
+
+void dispatch_app_key(uint32_t key, bool repeated) {
+    if (!app_key_handler) {
+        dispatch_nav_key(key);
+        return;
+    }
+
+    const auto app_key = normalize_app_key(key);
+    if (app_key != AppKey::None) {
+        app_key_handler(app_key, repeated, app_key_user_data);
+    }
+}
 
 size_t nav_key_to_index(uint32_t key) {
     if (nav_shortcut_mode) {
@@ -105,9 +161,10 @@ void key_event_cb(lv_event_t* event) {
         keypad->router_event_pending = false;
         const auto key = keypad->router_key;
         const bool pressed = keypad->router_pressed;
+        const bool repeated = keypad->router_repeated;
 
-        if (pressed && (!last_key_pressed || last_key != key)) {
-            dispatch_nav_key(key);
+        if (pressed && (repeated || !last_key_pressed || last_key != key)) {
+            dispatch_app_key(key, repeated);
         }
 
         last_key = key;
@@ -120,7 +177,7 @@ void key_event_cb(lv_event_t* event) {
     const bool pressed = lv_indev_get_state(indev) == LV_INDEV_STATE_PRESSED;
 
     if (pressed && (!last_key_pressed || last_key != key)) {
-        dispatch_nav_key(key);
+        dispatch_app_key(key, false);
     }
 
     last_key = key;
@@ -136,10 +193,29 @@ uint32_t map_evdev_key(uint16_t code) {
             return LV_KEY_LEFT;
         case KEY_RIGHT:
             return LV_KEY_RIGHT;
+        case KEY_UP:
+            return LV_KEY_UP;
+        case KEY_DOWN:
+            return LV_KEY_DOWN;
+        case KEY_ENTER:
+        case KEY_KPENTER:
+            return LV_KEY_ENTER;
         case KEY_Z:
             return 'z';
+        case KEY_X:
+            return 'x';
         case KEY_C:
             return 'c';
+        case KEY_F:
+            return 'f';
+        case KEY_G:
+            return 'g';
+        case KEY_M:
+            return 'm';
+        case KEY_L:
+            return 'l';
+        case KEY_T:
+            return 't';
         case KEY_4:
             return '4';
         case KEY_5:
@@ -166,8 +242,10 @@ bool has_nav_keys(int fd) {
         return (key_bits[code / bits_per_word] & (1UL << (code % bits_per_word))) != 0;
     };
 
-    return has_key(KEY_ESC) || has_key(KEY_LEFT) || has_key(KEY_RIGHT) || has_key(KEY_Z) ||
-           has_key(KEY_C) || has_key(KEY_4) || has_key(KEY_5) || has_key(KEY_6) ||
+    return has_key(KEY_ESC) || has_key(KEY_LEFT) || has_key(KEY_RIGHT) || has_key(KEY_UP) ||
+           has_key(KEY_DOWN) || has_key(KEY_ENTER) || has_key(KEY_F) || has_key(KEY_X) ||
+           has_key(KEY_Z) || has_key(KEY_C) || has_key(KEY_G) || has_key(KEY_M) ||
+           has_key(KEY_L) || has_key(KEY_T) || has_key(KEY_4) || has_key(KEY_5) || has_key(KEY_6) ||
            has_key(KEY_7) || has_key(KEY_8);
 }
 
@@ -186,15 +264,16 @@ void evdev_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
         }
 
         const auto key = map_evdev_key(input.code);
-        if (!key || input.value == 2) {
+        if (!key) {
             continue;
         }
 
         keypad->key = key;
-        keypad->state = input.value ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+        keypad->state = input.value == 0 ? LV_INDEV_STATE_RELEASED : LV_INDEV_STATE_PRESSED;
         keypad->router_event_pending = true;
         keypad->router_key = key;
         keypad->router_pressed = keypad->state == LV_INDEV_STATE_PRESSED;
+        keypad->router_repeated = input.value == 2;
         data->continue_reading = true;
         break;
     }
@@ -304,6 +383,22 @@ void attach_key_router(lv_indev_t* indev) {
     }
 
     lv_indev_add_event_cb(indev, key_event_cb, LV_EVENT_KEY, nullptr);
+}
+
+void set_app_key_handler(AppKeyHandler handler, void* user_data) {
+    app_key_handler = handler;
+    app_key_user_data = user_data;
+    last_key = 0;
+    last_key_pressed = false;
+}
+
+void clear_app_key_handler(void* user_data) {
+    if (!user_data || app_key_user_data == user_data) {
+        app_key_handler = nullptr;
+        app_key_user_data = nullptr;
+        last_key = 0;
+        last_key_pressed = false;
+    }
 }
 
 void set_nav_shortcut_mode(bool enabled) {

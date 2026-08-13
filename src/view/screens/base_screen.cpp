@@ -16,6 +16,7 @@ BaseScreen::BaseScreen(viewmodel::BaseViewModel& view_model, app::AssetManager& 
     : view_model_(view_model), assets_(assets) {}
 
 BaseScreen::~BaseScreen() {
+    platform::clear_app_key_handler(this);
     title_bar_.reset();
     nav_bar_.reset();
 
@@ -50,6 +51,14 @@ void BaseScreen::init() {
     reactive::bind_theme(content_, view_model_.dark_mode_subject(), reactive::ThemeRole::Surface);
 
     build_content(content_);
+    platform::set_app_key_handler(app_key_handler, this);
+}
+
+void BaseScreen::app_key_handler(platform::AppKey key, bool repeated, void* user_data) {
+    auto* screen = static_cast<BaseScreen*>(user_data);
+    if (screen) {
+        screen->handle_key(key, repeated);
+    }
 }
 
 lv_obj_t* BaseScreen::root() const {

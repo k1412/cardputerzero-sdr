@@ -118,7 +118,7 @@ bool DesktopSimulatorFrame::initialize_sdl() {
         return false;
     }
 
-    window_ = SDL_CreateWindow("Template App",
+    window_ = SDL_CreateWindow("Zero SDR — Cardputer Zero Simulator",
                                SDL_WINDOWPOS_CENTERED,
                                SDL_WINDOWPOS_CENTERED,
                                kWidth,
@@ -256,6 +256,33 @@ bool DesktopSimulatorFrame::initialize_display() {
 
     keypad_ = std::make_unique<DesktopVirtualKeypad>(display_);
     render();
+    return true;
+}
+
+bool DesktopSimulatorFrame::save_screen_png(const char* path) const {
+    if (!path || path[0] == '\0' || framebuffer_.empty()) {
+        return false;
+    }
+
+    std::vector<uint8_t> rgba(framebuffer_.size() * 4U);
+    for (size_t index = 0; index < framebuffer_.size(); ++index) {
+        const uint32_t pixel = framebuffer_[index];
+        rgba[index * 4U] = static_cast<uint8_t>((pixel >> 16U) & 0xffU);
+        rgba[index * 4U + 1U] = static_cast<uint8_t>((pixel >> 8U) & 0xffU);
+        rgba[index * 4U + 2U] = static_cast<uint8_t>(pixel & 0xffU);
+        rgba[index * 4U + 3U] = 0xffU;
+    }
+
+    png_image image{};
+    image.version = PNG_IMAGE_VERSION;
+    image.width = view::kScreenWidth;
+    image.height = view::kScreenHeight;
+    image.format = PNG_FORMAT_RGBA;
+    if (!png_image_write_to_file(&image, path, 0, rgba.data(), 0, nullptr)) {
+        LOG_ERROR("failed to save screen PNG {}: {}", path, image.message);
+        return false;
+    }
+    LOG_INFO("saved native screen PNG: {}", path);
     return true;
 }
 

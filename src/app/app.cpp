@@ -43,7 +43,7 @@
 #endif
 
 #ifndef APP_CONFIG_FILE
-#define APP_CONFIG_FILE "template-app.conf"
+#define APP_CONFIG_FILE "cardputerzero-sdr.conf"
 #endif
 
 namespace app {
@@ -68,13 +68,13 @@ std::string writable_config_path() {
     if (const char* xdg_config_home = std::getenv("XDG_CONFIG_HOME")) {
         const std::filesystem::path root(xdg_config_home);
         if (!root.empty() && root.is_absolute()) {
-            return (root / "template-app" / "template-app.conf").string();
+            return (root / "cardputerzero-sdr" / "cardputerzero-sdr.conf").string();
         }
     }
     if (const char* home = std::getenv("HOME")) {
         const std::filesystem::path root(home);
         if (!root.empty() && root.is_absolute()) {
-            return (root / ".config" / "template-app" / "template-app.conf").string();
+            return (root / ".config" / "cardputerzero-sdr" / "cardputerzero-sdr.conf").string();
         }
     }
     return APP_CONFIG_FILE;
@@ -140,7 +140,7 @@ lv_display_t* init_device_display() {
 
 int Application::run() {
     logger::Logger::init();
-    logger::Logger::set_tag("template");
+    logger::Logger::set_tag("zero-sdr");
 
     lv_init();
 
@@ -169,6 +169,22 @@ int Application::run() {
     } else {
         LOG_WARN("failed to load config {}: {}; using defaults", loaded_config_path, config_error);
     }
+
+#if USE_DESKTOP
+    if (const char* locale_code = std::getenv("ZERO_SDR_LOCALE")) {
+        for (const auto& locale : i18n::locales()) {
+            if (std::string(locale.code) == locale_code) {
+                view_model.set_locale(locale.locale);
+                break;
+            }
+        }
+    }
+    if (const char* start_page = std::getenv("ZERO_SDR_START_PAGE")) {
+        if (std::string(start_page) == "settings") {
+            view_model.show_settings_page();
+        }
+    }
+#endif
 
 #if USE_DESKTOP
     DesktopSimulatorFrame simulator_frame(assets);
@@ -202,12 +218,26 @@ int Application::run() {
 
     LOG_INFO("LVGL app started at {}x{}", lv_display_get_horizontal_resolution(display),
              lv_display_get_vertical_resolution(display));
+#if USE_DESKTOP
+    const char* screenshot_path = std::getenv("ZERO_SDR_SCREENSHOT");
+    const bool exit_after_screenshot = std::getenv("ZERO_SDR_SCREENSHOT_EXIT") != nullptr;
+    const uint32_t screenshot_started_at = lv_tick_get();
+    bool screenshot_saved = false;
+#endif
     while (running
 #if USE_DESKTOP
            && simulator_frame.process_events()
 #endif
     ) {
         lv_timer_handler();
+#if USE_DESKTOP
+        if (!screenshot_saved && screenshot_path && lv_tick_elaps(screenshot_started_at) >= 600U) {
+            screenshot_saved = simulator_frame.save_screen_png(screenshot_path);
+            if (screenshot_saved && exit_after_screenshot) {
+                running = false;
+            }
+        }
+#endif
         lv_delay_ms(5);
     }
 

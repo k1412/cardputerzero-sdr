@@ -7,11 +7,12 @@
 include(GNUInstallDirs)
 
 set(APP_DISPLAY_NAME "Zero SDR" CACHE STRING "Human-readable application name used by launchers and package filename")
-set(APP_DEBIAN_REVISION "m5stack1" CACHE STRING "Debian package revision/vendor suffix")
+set(APP_PACKAGE_NAME "cardputerzero-sdr" CACHE STRING "Debian package name")
+set(APP_DEBIAN_REVISION "1" CACHE STRING "Debian package revision/vendor suffix")
 set(APP_DEBIAN_ARCHITECTURE "arm64" CACHE STRING "Debian package architecture")
-set(APP_MAINTAINER "M5Stack <support@m5stack.com>" CACHE STRING "Debian package maintainer")
-set(APP_PACKAGE_DESCRIPTION "CardputerZero LVGL template application" CACHE STRING "Debian package summary")
-set(APP_INSTALL_SYSTEMD_SERVICE ON CACHE BOOL "Install a systemd service file for embedded deployments")
+set(APP_MAINTAINER "k1412 <w.y.v@live.com>" CACHE STRING "Debian package maintainer")
+set(APP_PACKAGE_DESCRIPTION "Keyboard-first SDR spectrum and waterfall receiver for Cardputer Zero" CACHE STRING "Debian package summary")
+set(APP_INSTALL_SYSTEMD_SERVICE OFF CACHE BOOL "Install a systemd service file for embedded deployments")
 
 set(APP_GENERATED_DIR "${CMAKE_CURRENT_BINARY_DIR}/generated/package")
 configure_file(
@@ -32,20 +33,12 @@ install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/template-app.conf"
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/cardputerzero-sdr.conf"
     DESTINATION "/etc"
 )
 
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/audio/"
-    DESTINATION "${CMAKE_INSTALL_DATADIR}/${APP_NAME}/audio"
-    PATTERN ".DS_Store" EXCLUDE
-)
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/${APP_NAME}/fonts"
-    PATTERN ".DS_Store" EXCLUDE
-)
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/images/"
-    DESTINATION "${CMAKE_INSTALL_DATADIR}/${APP_NAME}/images"
     PATTERN ".DS_Store" EXCLUDE
 )
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/images/"
@@ -71,19 +64,23 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/LICENSE.txt"
     DESTINATION "${CMAKE_INSTALL_DOCDIR}"
     RENAME "third-party-assets-license.txt"
 )
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/NOTO-LICENSE.txt"
+    DESTINATION "${CMAKE_INSTALL_DOCDIR}"
+    RENAME "noto-font-license.txt"
+)
 
 set(CPACK_GENERATOR "DEB")
 set(CPACK_PACKAGING_INSTALL_PREFIX "/usr")
 set(CPACK_OUTPUT_FILE_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}/dist")
-set(CPACK_PACKAGE_NAME "${APP_DISPLAY_NAME}")
-set(CPACK_PACKAGE_VENDOR "M5Stack")
+set(CPACK_PACKAGE_NAME "${APP_PACKAGE_NAME}")
+set(CPACK_PACKAGE_VENDOR "k1412")
 set(CPACK_PACKAGE_CONTACT "${APP_MAINTAINER}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${APP_PACKAGE_DESCRIPTION}")
 set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-set(CPACK_PACKAGE_FILE_NAME "${APP_DISPLAY_NAME}_${PROJECT_VERSION}_${APP_DEBIAN_REVISION}_${APP_DEBIAN_ARCHITECTURE}")
-set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/LICENSE.txt")
+set(CPACK_PACKAGE_FILE_NAME "${APP_PACKAGE_NAME}_${PROJECT_VERSION}-${APP_DEBIAN_REVISION}_${APP_DEBIAN_ARCHITECTURE}")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 
-string(TOLOWER "${APP_DISPLAY_NAME}" APP_DEBIAN_PACKAGE_NAME)
+string(TOLOWER "${APP_PACKAGE_NAME}" APP_DEBIAN_PACKAGE_NAME)
 string(REGEX REPLACE "[^a-z0-9+.-]" "-" APP_DEBIAN_PACKAGE_NAME "${APP_DEBIAN_PACKAGE_NAME}")
 set(CPACK_DEBIAN_PACKAGE_NAME "${APP_DEBIAN_PACKAGE_NAME}")
 set(CPACK_DEBIAN_PACKAGE_VERSION "${PROJECT_VERSION}")

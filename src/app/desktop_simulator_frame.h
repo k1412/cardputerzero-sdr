@@ -40,6 +40,7 @@ public:
     lv_display_t* display() const;
     bool process_events();
     void bind_dark_mode(lv_subject_t* dark_mode_subject);
+    bool save_screen_png(const char* path) const;
 
 private:
     static void flush_cb(lv_display_t* display, const lv_area_t* area, uint8_t* px_map);

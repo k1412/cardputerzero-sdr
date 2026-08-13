@@ -6,8 +6,8 @@
 
 #include "screen_manager.h"
 
-#include "apple_screen.h"
-#include "butter_screen.h"
+#include "radio_screen.h"
+#include "settings_screen.h"
 
 namespace app {
 namespace {
@@ -53,15 +53,15 @@ void ScreenManager::start() {
                                                          nullptr);
 }
 
-void ScreenManager::show_apple_screen() {
-    load_screen(std::make_unique<screen::AppleScreen>(view_model_, assets_));
-    loaded_page_ = model::AppPage::Apple;
+void ScreenManager::show_radio_screen() {
+    load_screen(std::make_unique<screen::RadioScreen>(view_model_, assets_));
+    loaded_page_ = model::AppPage::Radio;
     has_loaded_page_ = true;
 }
 
-void ScreenManager::show_butter_screen() {
-    load_screen(std::make_unique<screen::ButterScreen>(view_model_, assets_));
-    loaded_page_ = model::AppPage::Butter;
+void ScreenManager::show_settings_screen() {
+    load_screen(std::make_unique<screen::SettingsScreen>(view_model_, assets_));
+    loaded_page_ = model::AppPage::Settings;
     has_loaded_page_ = true;
 }
 
@@ -82,12 +82,12 @@ void ScreenManager::flush_requested_page() {
         return;
     }
 
-    if (requested_page_ == model::AppPage::Butter) {
-        show_butter_screen();
+    if (requested_page_ == model::AppPage::Settings) {
+        show_settings_screen();
         return;
     }
 
-    show_apple_screen();
+    show_radio_screen();
 }
 
 lv_obj_t* ScreenManager::current_screen() const {

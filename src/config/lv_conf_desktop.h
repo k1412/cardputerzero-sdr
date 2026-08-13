@@ -54,7 +54,7 @@
 #define LV_DRAW_BUF_ALIGN                  4
 
 /* Desktop-only rendering throughput */
-#define LV_DRAW_SW_DRAW_UNIT_CNT           4
+#define LV_DRAW_SW_DRAW_UNIT_CNT           1
 #define LV_DRAW_THREAD_PRIO                LV_THREAD_PRIO_HIGH
 
 #if defined(__aarch64__) || defined(__ARM_NEON) || defined(__ARM_NEON__)
@@ -176,8 +176,8 @@
    PERFORMANCE MONITOR
  *====================*/
 
-#define LV_USE_PERF_MONITOR                1
-#define LV_USE_SYSMON                      1
+#define LV_USE_PERF_MONITOR                0
+#define LV_USE_SYSMON                      0
 
 /*====================
    ANIMATION
