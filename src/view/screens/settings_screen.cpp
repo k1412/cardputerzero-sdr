@@ -46,7 +46,10 @@ void SettingsScreen::build_content(lv_obj_t* content) {
 }
 
 void SettingsScreen::handle_key(platform::AppKey key, bool repeated) {
-    LV_UNUSED(repeated);
+    if (repeated &&
+        !platform::accepts_app_key_repeat(platform::AppInputContext::Settings, key)) {
+        return;
+    }
     switch (key) {
         case platform::AppKey::Up: move_selection(-1); break;
         case platform::AppKey::Down: move_selection(1); break;

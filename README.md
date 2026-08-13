@@ -53,7 +53,7 @@ Not implemented or verified yet:
 | `0`–`9`, `.` | Open direct MHz entry | — |
 | Backspace | Delete direct-entry character | — |
 
-The bottom bar always shows the primary actions. Tuning keys support key repeat; destructive or hidden key chords are intentionally absent.
+The bottom bar always shows the primary actions. Z/C frequency tuning and F/X settings-row movement support controlled key repeat; step changes, toggles, confirmation, and direct entry execute once per press. Destructive or hidden key chords are intentionally absent.
 
 ## Desktop build
 

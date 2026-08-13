@@ -18,6 +18,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Atomic persistence for frequency, tuning step, gain, mute, theme, and language with strict range validation
 - Narrow udev permissions for Realtek RTL2832U `0bda:2832/2838` without a root service
 - Graceful audio-only degradation with translated `NO AUDIO` feedback while RF and spectrum remain live
+- Context-aware key-repeat policy that prevents held discrete keys from toggling values or pages repeatedly
 
 ### Known limitations
 

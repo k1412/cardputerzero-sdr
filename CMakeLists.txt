@@ -755,6 +755,10 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     target_link_libraries(radio_model_test PRIVATE ${PROJECT_NAME}_model)
     add_test(NAME radio_model COMMAND radio_model_test)
 
+    add_executable(input_policy_test tests/input_policy_test.cpp)
+    target_include_directories(input_policy_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/platform")
+    add_test(NAME input_policy COMMAND input_policy_test)
+
     add_executable(synthetic_spectrum_test tests/synthetic_spectrum_test.cpp)
     target_link_libraries(synthetic_spectrum_test PRIVATE ${PROJECT_NAME}_model)
     add_test(NAME synthetic_spectrum COMMAND synthetic_spectrum_test)

@@ -169,17 +169,21 @@ void RadioScreen::build_content(lv_obj_t* content) {
 }
 
 void RadioScreen::handle_key(platform::AppKey key, bool repeated) {
+    const auto input_context = direct_entry_active_
+        ? platform::AppInputContext::DirectEntry
+        : platform::AppInputContext::Radio;
+    if (repeated && !platform::accepts_app_key_repeat(input_context, key)) return;
+
     const int digit = platform::app_key_digit(key);
     if (digit >= 0) {
-        if (!repeated) append_direct_digit(digit);
+        append_direct_digit(digit);
         return;
     }
     if (key == platform::AppKey::Decimal) {
-        if (!repeated) append_direct_decimal();
+        append_direct_decimal();
         return;
     }
     if (direct_entry_active_) {
-        if (repeated) return;
         switch (key) {
             case platform::AppKey::Delete: delete_direct_character(); break;
             case platform::AppKey::Confirm: commit_direct_entry(); break;
