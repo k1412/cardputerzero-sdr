@@ -76,6 +76,20 @@ AppKey normalize_app_key(uint32_t key) {
         case 't':
         case 'T':
             return AppKey::Theme;
+        case '0': return AppKey::Digit0;
+        case '1': return AppKey::Digit1;
+        case '2': return AppKey::Digit2;
+        case '3': return AppKey::Digit3;
+        case '4': return AppKey::Digit4;
+        case '5': return AppKey::Digit5;
+        case '6': return AppKey::Digit6;
+        case '7': return AppKey::Digit7;
+        case '8': return AppKey::Digit8;
+        case '9': return AppKey::Digit9;
+        case '.': return AppKey::Decimal;
+        case LV_KEY_BACKSPACE:
+        case LV_KEY_DEL:
+            return AppKey::Delete;
         default:
             return AppKey::None;
     }
@@ -216,6 +230,14 @@ uint32_t map_evdev_key(uint16_t code) {
             return 'l';
         case KEY_T:
             return 't';
+        case KEY_0:
+            return '0';
+        case KEY_1:
+            return '1';
+        case KEY_2:
+            return '2';
+        case KEY_3:
+            return '3';
         case KEY_4:
             return '4';
         case KEY_5:
@@ -226,6 +248,14 @@ uint32_t map_evdev_key(uint16_t code) {
             return '7';
         case KEY_8:
             return '8';
+        case KEY_9:
+            return '9';
+        case KEY_DOT:
+        case KEY_KPDOT:
+            return '.';
+        case KEY_BACKSPACE:
+        case KEY_DELETE:
+            return LV_KEY_BACKSPACE;
         default:
             return 0;
     }
@@ -375,6 +405,11 @@ void init_key_input(lv_display_t* display) {
 #else
     LV_UNUSED(display);
 #endif
+}
+
+int app_key_digit(AppKey key) {
+    const auto value = static_cast<int>(key) - static_cast<int>(AppKey::Digit0);
+    return value >= 0 && value <= 9 ? value : -1;
 }
 
 void attach_key_router(lv_indev_t* indev) {

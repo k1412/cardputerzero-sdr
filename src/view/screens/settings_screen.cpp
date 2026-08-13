@@ -56,6 +56,18 @@ void SettingsScreen::handle_key(platform::AppKey key, bool repeated) {
         case platform::AppKey::Mute: view_model().toggle_muted(); refresh_rows(); break;
         case platform::AppKey::Language: view_model().cycle_locale(); refresh_rows(); break;
         case platform::AppKey::Theme: view_model().toggle_dark_mode(); refresh_rows(); break;
+        case platform::AppKey::Digit0:
+        case platform::AppKey::Digit1:
+        case platform::AppKey::Digit2:
+        case platform::AppKey::Digit3:
+        case platform::AppKey::Digit4:
+        case platform::AppKey::Digit5:
+        case platform::AppKey::Digit6:
+        case platform::AppKey::Digit7:
+        case platform::AppKey::Digit8:
+        case platform::AppKey::Digit9:
+        case platform::AppKey::Decimal:
+        case platform::AppKey::Delete:
         case platform::AppKey::None: break;
     }
 }

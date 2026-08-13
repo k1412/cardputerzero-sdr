@@ -21,10 +21,10 @@ This establishes the dongle baseline only. It does not prove Cardputer Zero USB-
 | --- | --- | --- | --- |
 | Install | Install release `.deb`, launch from APPLaunch | correct icon/title; clean start/exit | Pending device |
 | Display | Inspect radio/settings in dark and light themes | no clipping, tearing, overlays, or unreadable text | Pending device |
-| Keys | Exercise F/X/Z/C, Enter, Esc, G/M/L/T and hold-to-repeat | one action per press; repeat is controlled; Esc returns safely | Pending device |
+| Keys | Exercise F/X/Z/C, Enter, Esc, G/M/L/T, number row, period, Backspace, and hold-to-repeat | one action per press; repeat is controlled; Esc returns safely | Pending device |
 | USB discovery | Cold boot, hot-plug, unplug/replug RTL2832U | state changes without crash; UI stays responsive | Pending device |
 | USB power | Capture continuously with screen/audio active | no brownout, disconnect loop, or thermal warning | Pending device |
-| Tuning | Test 22.0 MHz, 97.4 MHz, and 948.6 MHz boundaries | no overflow/wrap; device receives valid settings | Pending device |
+| Tuning | Test 22.0, 97.4, and 948.6 MHz by stepping and direct entry; try 21.999/948.601 | valid values tune exactly; invalid values are rejected; no overflow/wrap | Pending device |
 | RF capture | Run 2.048 MS/s for 30 minutes | no sustained overruns; reconnect path works | Pending device |
 | WFM audio | Receive a known station, mute/unmute, unplug device | intelligible audio; no loud transient; mute is immediate | Pending device |
 | Performance | Record CPU, memory, UI frame cadence, audio underruns | thresholds documented from real measurements | Pending device |

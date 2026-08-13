@@ -18,6 +18,7 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 - 原生 320×170 频谱和瀑布图界面
 - 基于实测 FM 电台位置构造的可复现离线演示
 - 适配 Cardputer 的按键映射与长按连续调谐
+- 使用数字行直接输入 MHz，支持小数点、退格、Enter 和 Esc
 - 与实测 FC0012 调谐器一致的 22.0–948.6 MHz 频率边界
 - 从 10 kHz 到 1 MHz 的六档调谐步进
 - 自动/手动增益、静音、深色/浅色主题
@@ -48,6 +49,8 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 | `M` | 静音/取消静音 | 静音/取消静音 |
 | `L` | 切换下一种语言 | 切换下一种语言 |
 | `T` | 切换深色/浅色主题 | 切换深色/浅色主题 |
+| `0`–`9`、`.` | 打开 MHz 直接输入 | — |
+| 退格 | 删除直接输入的字符 | — |
 
 底栏始终显示主要操作提示。调谐键支持长按连续触发；项目刻意避免破坏性操作和隐藏组合键。
 
@@ -77,7 +80,7 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 ./build/linux-x86-64/Debug/cardputerzero-sdr
 ```
 
-使用 `scripts/smoke_locales.sh` 可检查十种语言的两个页面。
+使用 `scripts/smoke_locales.sh` 可检查十种语言的无线电、设置和直接调谐三种状态。如只需截取直接调谐浮层，请从无线电页面启动并设置 `ZERO_SDR_DIRECT_ENTRY=103.9`。
 
 ## Cardputer Zero 构建
 

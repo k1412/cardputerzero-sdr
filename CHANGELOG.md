@@ -8,6 +8,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 
 - Native 320×170 radio, spectrum, waterfall, and settings screens
 - Cardputer keyboard mapping and repeat-aware tuning
+- Direct MHz frequency entry using the physical number row
 - Deterministic offline spectrum demo
 - Ten-language catalog with bundled CJK/Cyrillic font subsets
 - Desktop screenshot automation and model/DSP/i18n tests

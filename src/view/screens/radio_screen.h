@@ -7,6 +7,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 
 namespace screen {
 
@@ -28,6 +29,13 @@ private:
     void refresh_locale();
     void refresh_spectrum();
     void update_waterfall(const dsp::SpectrumFrame& frame);
+    void begin_direct_entry();
+    void append_direct_digit(int digit);
+    void append_direct_decimal();
+    void delete_direct_character();
+    void commit_direct_entry();
+    void cancel_direct_entry();
+    void refresh_direct_entry();
 
     lv_obj_t* chart_{nullptr};
     lv_chart_series_t* series_{nullptr};
@@ -36,7 +44,14 @@ private:
     lv_obj_t* gain_label_{nullptr};
     lv_obj_t* step_label_{nullptr};
     lv_obj_t* muted_label_{nullptr};
+    lv_obj_t* direct_panel_{nullptr};
+    lv_obj_t* direct_title_{nullptr};
+    lv_obj_t* direct_value_{nullptr};
+    lv_obj_t* direct_hint_{nullptr};
     lv_timer_t* refresh_timer_{nullptr};
+    std::string direct_entry_;
+    bool direct_entry_active_{false};
+    bool direct_entry_error_{false};
     std::array<int32_t, dsp::kSpectrumBinCount> chart_values_{};
     std::array<uint16_t, kWaterfallWidth * kWaterfallHeight> waterfall_pixels_{};
 };

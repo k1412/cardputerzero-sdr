@@ -8,10 +8,12 @@ locales=(en zh-CN zh-TW es ja ko fr de pt-BR ru)
 mkdir -p "$output_dir"
 
 for locale in "${locales[@]}"; do
-  for page in radio settings; do
+  for page in radio settings direct-tune; do
     page_env=()
     if [[ "$page" == "settings" ]]; then
       page_env=(ZERO_SDR_START_PAGE=settings)
+    elif [[ "$page" == "direct-tune" ]]; then
+      page_env=(ZERO_SDR_DIRECT_ENTRY=103.9)
     fi
     env SDL_VIDEODRIVER=dummy \
       ZERO_SDR_LOCALE="$locale" \

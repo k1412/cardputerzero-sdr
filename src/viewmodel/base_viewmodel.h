@@ -44,6 +44,7 @@ public:
     void show_radio_page();
     void show_settings_page();
     void toggle_page();
+    void set_frequency_hz(uint32_t frequency_hz);
     void tune(int direction);
     void cycle_tuning_step(int direction);
     void toggle_gain_mode();

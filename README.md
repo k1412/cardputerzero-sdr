@@ -18,6 +18,7 @@ Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. 
 - Native 320×170 spectrum and waterfall UI
 - Deterministic demo centered on measured FM stations
 - Cardputer key mapping with repeat-aware tuning
+- Direct MHz entry from the number row with decimal, backspace, Enter, and Esc handling
 - Frequency clamp matching the tested FC0012 dongle: 22.0–948.6 MHz
 - Six tuning steps from 10 kHz to 1 MHz
 - Automatic/manual gain state, mute state, dark/light theme
@@ -48,6 +49,8 @@ Not implemented or verified yet:
 | `M` | Mute/unmute | Mute/unmute |
 | `L` | Next language | Next language |
 | `T` | Dark/light theme | Dark/light theme |
+| `0`–`9`, `.` | Open direct MHz entry | — |
+| Backspace | Delete direct-entry character | — |
 
 The bottom bar always shows the primary actions. Tuning keys support key repeat; destructive or hidden key chords are intentionally absent.
 
@@ -77,7 +80,7 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 ./build/linux-x86-64/Debug/cardputerzero-sdr
 ```
 
-Run both pages in all ten locales with `scripts/smoke_locales.sh`.
+Run the radio, settings, and direct-tuning states in all ten locales with `scripts/smoke_locales.sh`. To capture only the direct-tuning overlay, start on the radio page and set `ZERO_SDR_DIRECT_ENTRY=103.9`.
 
 ## Cardputer Zero build
 

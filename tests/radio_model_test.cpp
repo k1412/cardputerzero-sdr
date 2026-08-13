@@ -1,10 +1,25 @@
 // SPDX-License-Identifier: MIT
 
 #include "radio_model.h"
+#include "frequency_entry.h"
 
 #include <cassert>
 
 int main() {
+    uint32_t parsed_frequency = 0;
+    assert(model::parse_frequency_mhz("97.4", parsed_frequency));
+    assert(parsed_frequency == 97'400'000);
+    assert(model::parse_frequency_mhz("103.900", parsed_frequency));
+    assert(parsed_frequency == 103'900'000);
+    assert(model::parse_frequency_mhz("22", parsed_frequency));
+    assert(parsed_frequency == model::RadioModel::kMinimumFrequencyHz);
+    assert(model::parse_frequency_mhz("948.6", parsed_frequency));
+    assert(parsed_frequency == model::RadioModel::kMaximumFrequencyHz);
+    assert(!model::parse_frequency_mhz("21.999", parsed_frequency));
+    assert(!model::parse_frequency_mhz("948.601", parsed_frequency));
+    assert(!model::parse_frequency_mhz("97.4000", parsed_frequency));
+    assert(!model::parse_frequency_mhz("9x.4", parsed_frequency));
+
     model::RadioModel radio;
     assert(radio.frequency_hz() == model::RadioModel::kDefaultFrequencyHz);
     assert(radio.tuning_step_hz() == 200'000);

@@ -5,11 +5,12 @@
   "bin_name": "cardputerzero-sdr",
   "description": "Keyboard-first RTL-SDR spectrum and waterfall receiver for Cardputer Zero",
   "store": {
-    "summary": "Tune RTL-SDR with a native spectrum, waterfall, and Cardputer keyboard controls.",
+    "summary": "Tune RTL-SDR with a native spectrum, waterfall, and direct Cardputer keyboard entry.",
     "description": "A Cardputer Zero-native SDR receiver designed for its 320×170 screen and physical keyboard. It includes a deterministic offline demo plus a local RTL-SDR/WFM receive path; the first store release is held until USB, audio, and performance validation passes on physical hardware.",
     "categories": ["Tools", "Radio"],
     "screenshots": [
       "screenshots/radio-dark.png",
+      "screenshots/direct-tune-dark.png",
       "screenshots/settings-dark.png",
       "screenshots/settings-zh-cn.png"
     ],

@@ -4,10 +4,13 @@
 
 #include "asset_manager.h"
 #include "bindings.h"
+#include "frequency_entry.h"
 #include "theme.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstring>
+#include <string>
 
 namespace screen {
 namespace {
@@ -126,13 +129,66 @@ void RadioScreen::build_content(lv_obj_t* content) {
                          LV_COLOR_FORMAT_RGB565);
     lv_obj_align(waterfall_, LV_ALIGN_BOTTOM_MID, 0, 0);
 
+    direct_panel_ = lv_obj_create(content);
+    lv_obj_set_size(direct_panel_, 294, 78);
+    lv_obj_align(direct_panel_, LV_ALIGN_CENTER, 0, 1);
+    lv_obj_set_style_radius(direct_panel_, 7, 0);
+    lv_obj_set_style_border_width(direct_panel_, 1, 0);
+    lv_obj_set_style_pad_all(direct_panel_, 5, 0);
+    lv_obj_clear_flag(direct_panel_, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_flag(direct_panel_, LV_OBJ_FLAG_HIDDEN);
+
+    direct_title_ = lv_label_create(direct_panel_);
+    lv_obj_set_width(direct_title_, LV_PCT(100));
+    lv_obj_set_style_text_align(direct_title_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(direct_title_, LV_ALIGN_TOP_MID, 0, 0);
+
+    direct_value_ = lv_label_create(direct_panel_);
+    lv_obj_set_width(direct_value_, LV_PCT(100));
+    auto* direct_value_font = assets().load_font("inter-semibold.ttf", 24);
+    if (!direct_value_font) direct_value_font = const_cast<lv_font_t*>(&lv_font_montserrat_24);
+    lv_obj_set_style_text_font(direct_value_, direct_value_font, 0);
+    lv_obj_set_style_text_align(direct_value_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(direct_value_, LV_ALIGN_CENTER, 0, 0);
+
+    direct_hint_ = lv_label_create(direct_panel_);
+    lv_obj_set_width(direct_hint_, LV_PCT(100));
+    lv_obj_set_style_text_align(direct_hint_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(direct_hint_, LV_ALIGN_BOTTOM_MID, 0, 0);
+
     refresh_spectrum();
     refresh_locale();
+#if USE_DESKTOP
+    if (const char* preview = std::getenv("ZERO_SDR_DIRECT_ENTRY")) {
+        for (const char* cursor = preview; *cursor != '\0'; ++cursor) {
+            if (*cursor >= '0' && *cursor <= '9') append_direct_digit(*cursor - '0');
+            else if (*cursor == '.') append_direct_decimal();
+        }
+    }
+#endif
     refresh_timer_ = lv_timer_create(refresh_timer_cb, 120, this);
 }
 
 void RadioScreen::handle_key(platform::AppKey key, bool repeated) {
-    LV_UNUSED(repeated);
+    const int digit = platform::app_key_digit(key);
+    if (digit >= 0) {
+        if (!repeated) append_direct_digit(digit);
+        return;
+    }
+    if (key == platform::AppKey::Decimal) {
+        if (!repeated) append_direct_decimal();
+        return;
+    }
+    if (direct_entry_active_) {
+        if (repeated) return;
+        switch (key) {
+            case platform::AppKey::Delete: delete_direct_character(); break;
+            case platform::AppKey::Confirm: commit_direct_entry(); break;
+            case platform::AppKey::Back: cancel_direct_entry(); break;
+            default: break;
+        }
+        return;
+    }
     switch (key) {
         case platform::AppKey::Left: view_model().tune(-1); break;
         case platform::AppKey::Right: view_model().tune(1); break;
@@ -144,8 +200,99 @@ void RadioScreen::handle_key(platform::AppKey key, bool repeated) {
         case platform::AppKey::Mute: view_model().toggle_muted(); break;
         case platform::AppKey::Language: view_model().cycle_locale(); refresh_locale(); break;
         case platform::AppKey::Theme: view_model().toggle_dark_mode(); break;
+        case platform::AppKey::Digit0:
+        case platform::AppKey::Digit1:
+        case platform::AppKey::Digit2:
+        case platform::AppKey::Digit3:
+        case platform::AppKey::Digit4:
+        case platform::AppKey::Digit5:
+        case platform::AppKey::Digit6:
+        case platform::AppKey::Digit7:
+        case platform::AppKey::Digit8:
+        case platform::AppKey::Digit9:
+        case platform::AppKey::Decimal:
+        case platform::AppKey::Delete:
         case platform::AppKey::None: break;
     }
+}
+
+void RadioScreen::begin_direct_entry() {
+    direct_entry_.clear();
+    direct_entry_error_ = false;
+    direct_entry_active_ = true;
+    lv_obj_remove_flag(direct_panel_, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_move_foreground(direct_panel_);
+    refresh_direct_entry();
+}
+
+void RadioScreen::append_direct_digit(int digit) {
+    if (!direct_entry_active_) begin_direct_entry();
+    const auto decimal = direct_entry_.find('.');
+    const auto whole_length = decimal == std::string::npos ? direct_entry_.size() : decimal;
+    const auto fraction_length = decimal == std::string::npos
+        ? 0
+        : direct_entry_.size() - decimal - 1;
+    if ((decimal == std::string::npos && whole_length >= 3) ||
+        (decimal != std::string::npos && fraction_length >= 3)) {
+        return;
+    }
+    direct_entry_.push_back(static_cast<char>('0' + digit));
+    direct_entry_error_ = false;
+    refresh_direct_entry();
+}
+
+void RadioScreen::append_direct_decimal() {
+    if (!direct_entry_active_) begin_direct_entry();
+    if (direct_entry_.find('.') != std::string::npos) return;
+    if (direct_entry_.empty()) direct_entry_ = "0";
+    direct_entry_.push_back('.');
+    direct_entry_error_ = false;
+    refresh_direct_entry();
+}
+
+void RadioScreen::delete_direct_character() {
+    if (!direct_entry_.empty()) direct_entry_.pop_back();
+    direct_entry_error_ = false;
+    refresh_direct_entry();
+}
+
+void RadioScreen::commit_direct_entry() {
+    uint32_t frequency_hz = 0;
+    if (!model::parse_frequency_mhz(direct_entry_, frequency_hz)) {
+        direct_entry_error_ = true;
+        refresh_direct_entry();
+        return;
+    }
+    view_model().set_frequency_hz(frequency_hz);
+    cancel_direct_entry();
+}
+
+void RadioScreen::cancel_direct_entry() {
+    direct_entry_.clear();
+    direct_entry_error_ = false;
+    direct_entry_active_ = false;
+    lv_obj_add_flag(direct_panel_, LV_OBJ_FLAG_HIDDEN);
+}
+
+void RadioScreen::refresh_direct_entry() {
+    if (!direct_panel_) return;
+    const auto colors = view::palette(view_model().is_dark_mode());
+    lv_obj_set_style_bg_color(direct_panel_, colors.surface, 0);
+    lv_obj_set_style_bg_opa(direct_panel_, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_color(direct_panel_, direct_entry_error_ ? lv_color_hex(0xff6b6b) : colors.primary, 0);
+    lv_obj_set_style_text_color(direct_title_, direct_entry_error_ ? lv_color_hex(0xff6b6b) : colors.primary, 0);
+    lv_obj_set_style_text_color(direct_value_, colors.text, 0);
+    lv_obj_set_style_text_color(direct_hint_, colors.text_disabled, 0);
+
+    const std::string title = direct_entry_error_
+        ? "22.000-948.600 MHz"
+        : std::string(view_model().text(i18n::Text::Tune)) + " MHz";
+    const std::string value = direct_entry_.empty() ? "_" : direct_entry_ + "_";
+    const std::string hint = std::string("ENT ") + view_model().text(i18n::Text::Select) +
+                             " / ESC " + view_model().text(i18n::Text::Back);
+    lv_label_set_text(direct_title_, title.c_str());
+    lv_label_set_text(direct_value_, value.c_str());
+    lv_label_set_text(direct_hint_, hint.c_str());
 }
 
 void RadioScreen::refresh_timer_cb(lv_timer_t* timer) {
@@ -175,10 +322,14 @@ void RadioScreen::refresh_locale() {
             lv_obj_set_style_text_font(label, locale_font, 0);
         }
     }
+    for (auto* label : {direct_title_, direct_hint_}) {
+        if (label) lv_obj_set_style_text_font(label, locale_font, 0);
+    }
     if (muted_label_) {
         lv_label_set_text(muted_label_,
                           view_model().is_muted() ? view_model().text(i18n::Text::Muted) : "");
     }
+    if (direct_entry_active_) refresh_direct_entry();
 }
 
 void RadioScreen::refresh_spectrum() {

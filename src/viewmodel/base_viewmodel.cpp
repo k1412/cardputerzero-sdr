@@ -140,6 +140,12 @@ void BaseViewModel::toggle_page() {
     publish_all();
 }
 
+void BaseViewModel::set_frequency_hz(uint32_t frequency_hz) {
+    model_.set_frequency_hz(frequency_hz);
+    radio_session_.request_frequency(model_.frequency_hz());
+    publish_radio_state();
+}
+
 void BaseViewModel::tune(int direction) {
     model_.tune(direction);
     radio_session_.request_frequency(model_.frequency_hz());
