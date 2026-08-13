@@ -33,6 +33,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Device-package CI enforcement of the pinned authoritative Store install-path and archive-safety policy
 - P0 package, `plugdev`, distro-udev, and USB high-speed gates with privacy-preserving evidence
 - Localized USB-access recovery and device-busy guidance instead of a generic hardware error
+- Stable compiler source paths and no transient CI/workspace path in the device binary
 
 ### Known limitations
 

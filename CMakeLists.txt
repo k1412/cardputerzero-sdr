@@ -33,6 +33,12 @@ set(APP_BUNDLE_RTLSDR ON CACHE BOOL "Bundle a pinned librtlsdr runtime in Cardpu
 # Used for IDE IntelliSense
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compile_commands.json" FORCE)
 
+# Keep compiler-provided source locations stable across local and CI build roots.
+# This covers __FILE__ strings used by the logger and LVGL assertions.
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options("-ffile-prefix-map=${CMAKE_SOURCE_DIR}=.")
+endif()
+
 if(NOT APP_CONFIG_FILE)
     if(USE_DESKTOP)
         set(APP_CONFIG_FILE "${CMAKE_CURRENT_SOURCE_DIR}/config/cardputerzero-sdr.conf")
@@ -706,10 +712,20 @@ target_compile_definitions(${PROJECT_NAME}_core
         APP_NAME="${APP_NAME}"
         APP_CONFIG_FILE="${APP_CONFIG_FILE}"
         APP_CMAKE_ASSETS_ROOT="${APP_ASSETS_ROOT}"
-        APP_SOURCE_ASSETS_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/assets"
         APP_DRM_DEVICE="${APP_DRM_DEVICE}"
         APP_DRM_CONNECTOR_ID=${APP_DRM_CONNECTOR_ID}
 )
+
+if(USE_DESKTOP)
+    target_compile_definitions(${PROJECT_NAME}_core
+        PUBLIC APP_SOURCE_ASSETS_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    )
+else()
+    # Device packages use /usr/share/${APP_NAME}; do not embed the transient build root.
+    target_compile_definitions(${PROJECT_NAME}_core
+        PUBLIC APP_SOURCE_ASSETS_ROOT=""
+    )
+endif()
 
 target_link_libraries(${PROJECT_NAME}_core
     PUBLIC
