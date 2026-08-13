@@ -40,6 +40,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Whole-directory P0 evidence validation covering device-tree identity, preflight privacy/access, launcher restoration, clean exit, monotonic diagnostics, and resource-sample duration
 - Draft official Store submission for independent package validation, explicitly held from review and merge until physical P0 evidence is attached
 - Explicit `ZSDR` Store share code to avoid the registry generator's colliding `card` package-prefix fallback
+- Debian revision 6 for the Store candidate so the packaged README and metadata-status documentation have a unique, reproducible version
 
 ### Known limitations
 
