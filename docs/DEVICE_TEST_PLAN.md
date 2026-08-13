@@ -51,7 +51,7 @@ Run this separately from hot-plug and failure-injection tests so intentional rec
 cardputerzero-sdr-p0 --preflight-only
 ```
 
-The preflight must report `schema=zero-sdr-p0-v3` and `preflight=PASS`. Confirm `app_processes=0`, `launcher_service=active` or `inactive`, `plugdev_membership=present`, both package records are installed ARM64 builds, `rtl_udev_rule=valid`, and at least one accessible RTL-SDR reports `high_speed=1`; then inspect its framebuffer, input-event, USB-node, and ALSA facts rather than bypassing a failure with root. Keep audio unmuted on a known WFM station, then start the evidence run and exercise the physical controls while it remains active:
+The preflight must report `schema=zero-sdr-p0-v4` and `preflight=PASS`. Confirm a non-empty `device_model`, one of the official `cardputerzero-overlay`, `cardputerzero-v3-overlay`, or `cardputerzero-v5-overlay` values, `app_processes=0`, `launcher_service=active` or `inactive`, `plugdev_membership=present`, both package records are installed ARM64 builds, `rtl_udev_rule=valid`, and at least one accessible RTL-SDR reports `high_speed=1`; then inspect its framebuffer, input-event, USB-node, and ALSA facts rather than bypassing a failure with root. Keep audio unmuted on a known WFM station, then start the evidence run and exercise the physical controls while it remains active:
 
 ```sh
 cardputerzero-sdr-p0 --duration 1800
@@ -60,8 +60,14 @@ cardputerzero-sdr-p0 --duration 1800
 The full runner pauses an active `APPLaunch.service` as the same non-root user so the child exclusively owns the framebuffer, and restores it through the exit trap. Require `launcher_stop_status=0` and `launcher_restart_status=0` when `launcher_was_active=1`; `not-needed` is correct when the service was already inactive. The runner writes a mode-0700 evidence directory containing `preflight.txt`, `app.log`, `resources.csv`, and `result.txt`; the default location is below `$XDG_STATE_HOME/cardputerzero-sdr/evidence/` or `~/.local/state/`. It excludes hostname, network state, and USB serials. Copy that directory into a repository checkout on the development machine, then run:
 
 ```sh
-python3 scripts/summarize_diagnostics.py --p0 path/to/evidence/app.log
+python3 scripts/summarize_diagnostics.py --p0 path/to/evidence
 ```
+
+The evaluator requires the complete directory. It cross-checks `preflight.txt`,
+`result.txt`, `resources.csv`, and `app.log`; a log copied without its launcher,
+process-exit, package/access, and resource evidence is not a valid P0 result.
+The result schema must be `zero-sdr-p0-result-v2` and record the actual resource
+sampling interval.
 
 The expected RF input is 2.048 million complex samples/s at two unsigned bytes per sample, or 4,096,000 bytes/s. A 16,384-byte input block represents 8,192 complex samples and 4,000 µs of RF time, so average spectrum plus demodulation work must stay below 4,000 µs/block. Unmuted WFM output should approach 32,000 mono frames/s. The automated P0 evaluation requires:
 
@@ -79,6 +85,6 @@ Retain `max_processing_us` and `max_ui_gap_ms` in the evidence. They expose sche
 - Device model/OS image and kernel version
 - Dongle tuner/USB ID and whether external power was used
 - `.deb` checksum
-- `cardputerzero-sdr-p0` preflight/result, 30-minute app log, resource CSV, and `summarize_diagnostics.py --p0` output
+- complete `cardputerzero-sdr-p0` evidence directory and its `summarize_diagnostics.py --p0` PASS output
 - Photos or native screenshots of both pages
 - Completed table above with issue links for any waiver

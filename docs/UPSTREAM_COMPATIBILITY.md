@@ -50,6 +50,10 @@ an explicitly matching `CM0_SDK_SHA256` value.
   user to `plugdev`, and the current Store backend resolves an unsatisfied local
   `.deb` dependency with `apt-get install`. Normal-user access remains a
   physical P0 gate instead of relying on privilege escalation.
+- The official image verifier accepts `cardputerzero-overlay`,
+  `cardputerzero-v3-overlay`, and `cardputerzero-v5-overlay` in the boot
+  configuration. P0 records the base device-tree model and requires one of
+  those overlay identities so evidence cannot come from a generic ARM64 host.
 - Device-package CI downloads the Store install-path policy from the exact
   audited `CardputerZero/packages` revision, verifies the policy script digest,
   and applies it to the built `.deb`. It also mirrors the server's setuid,

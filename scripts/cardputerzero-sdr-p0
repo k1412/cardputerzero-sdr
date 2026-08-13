@@ -109,7 +109,7 @@ preflight_ok=1
 
 read_trimmed() {
     if [ -r "$1" ]; then
-        tr '\n\r' '  ' <"$1" | sed 's/[[:space:]][[:space:]]*/ /g; s/^ //; s/ $//'
+        tr '\000\n\r' '   ' <"$1" | sed 's/[[:space:]][[:space:]]*/ /g; s/^ //; s/ $//'
     fi
 }
 
@@ -154,11 +154,40 @@ for required_tool in awk grep ps readlink sed stat systemctl tr; do
 done
 
 {
-    echo "schema=zero-sdr-p0-v3"
+    echo "schema=zero-sdr-p0-v4"
     echo "created_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "kernel=$(uname -srmo 2>/dev/null || echo unavailable)"
     echo "os_id=$(os_value ID)"
     echo "os_version=$(os_value VERSION_ID)"
+    device_model_path="$sys_root/firmware/devicetree/base/model"
+    if [ ! -r "$device_model_path" ] && [ -r "$proc_root/device-tree/model" ]; then
+        device_model_path="$proc_root/device-tree/model"
+    fi
+    device_model=$(read_trimmed "$device_model_path")
+    echo "device_model=${device_model:-missing} path=$device_model_path"
+    [ -n "$device_model" ] || preflight_ok=0
+    boot_config="$fs_root/boot/firmware/config.txt"
+    if [ ! -r "$boot_config" ] && [ -r "$fs_root/boot/config.txt" ]; then
+        boot_config="$fs_root/boot/config.txt"
+    fi
+    cardputerzero_overlay=""
+    if [ -r "$boot_config" ]; then
+        cardputerzero_overlay=$(awk -F'[=,]' '
+            {
+                key = $1
+                overlay = $2
+                gsub(/[[:space:]]/, "", key)
+                gsub(/[[:space:]]/, "", overlay)
+                if (key == "dtoverlay" &&
+                    overlay ~ /^cardputerzero(-v[35])?-overlay$/) {
+                    print overlay
+                    exit
+                }
+            }
+        ' "$boot_config")
+    fi
+    echo "cardputerzero_overlay=${cardputerzero_overlay:-missing} path=$boot_config"
+    [ -n "$cardputerzero_overlay" ] || preflight_ok=0
     echo "uid=$(id -u)"
     echo "gid=$(id -g)"
     user_groups=$(id -Gn 2>/dev/null || true)
@@ -445,11 +474,12 @@ restore_launcher
 trap - 0
 
 {
-    echo "schema=zero-sdr-p0-result-v1"
+    echo "schema=zero-sdr-p0-result-v2"
     echo "started_epoch=$started_epoch"
     echo "ended_epoch=$ended_epoch"
     echo "runtime_seconds=$((ended_epoch - started_epoch))"
     echo "requested_seconds=$duration"
+    echo "sample_interval_seconds=$interval"
     echo "duration_complete=$completed"
     echo "app_exit_status=$app_status"
     echo "forced_kill=$forced_kill"
@@ -461,7 +491,7 @@ trap - 0
 
 echo "evidence directory: $output"
 echo "copy it to the development checkout and run:"
-echo "python3 scripts/summarize_diagnostics.py --p0 $output/app.log"
+echo "python3 scripts/summarize_diagnostics.py --p0 $output"
 
 if [ "$completed" -ne 1 ] || [ "$app_status" -ne 0 ] ||
    [ "$launcher_restart_status" = 1 ]; then

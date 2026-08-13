@@ -37,6 +37,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Store metadata aligned with the registry-consumed permission object plus localized detail text for all ten app languages
 - Non-root P0 pause/restore of the APPLaunch user service for exclusive framebuffer evidence, with concurrent-instance rejection
 - Distinct `Zero SDR Keyboard` Store/APPLaunch listing title to avoid ambiguity with the existing third-party `zerosdr` package
+- Whole-directory P0 evidence validation covering device-tree identity, preflight privacy/access, launcher restoration, clean exit, monotonic diagnostics, and resource-sample duration
 
 ### Known limitations
 

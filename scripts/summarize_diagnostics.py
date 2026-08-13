@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import csv
 import re
 import sys
 from pathlib import Path
@@ -15,7 +16,20 @@ EXPECTED_IQ_BYTES_PER_SECOND = 4_096_000.0
 EXPECTED_AUDIO_FRAMES_PER_SECOND = 32_000.0
 IQ_BLOCK_BUDGET_US = 4_000.0
 P0_RUNTIME_SECONDS = 30 * 60
+P0_DIAGNOSTICS_INTERVAL_SECONDS = 30
 FIELD_PATTERN = re.compile(r"\b([a-z_]+)=([0-9]+)\b")
+RESOURCE_FIELDS = [
+    "epoch", "pid", "state", "elapsed_s", "cpu_percent", "rss_kib",
+    "vsz_kib", "mem_available_kib", "max_temp_millic",
+]
+MONOTONIC_FIELDS = {
+    "uptime_ms", "ui_loops", "max_ui_gap_ms", "connection_attempts",
+    "successful_connections", "retry_waits", "read_errors",
+    "settings_updates", "iq_blocks", "iq_bytes", "audio_generated",
+    "audio_written", "audio_dropped", "audio_recoveries",
+    "audio_write_errors", "audio_open_failures", "total_processing_us",
+    "max_processing_us",
+}
 
 
 def load_snapshots(path: str) -> list[dict[str, int]]:
@@ -40,6 +54,200 @@ def rate(value: int, runtime_seconds: float) -> float:
 
 def within_ten_percent(observed: float, expected: float) -> bool:
     return expected * 0.90 <= observed <= expected * 1.10
+
+
+def load_key_values(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key] = value
+    return values
+
+
+def integer_value(values: dict[str, str], key: str) -> int | None:
+    try:
+        return int(values[key])
+    except (KeyError, ValueError):
+        return None
+
+
+def load_resource_rows(path: Path) -> tuple[list[str], list[dict[str, str]]]:
+    with path.open(encoding="utf-8", errors="replace", newline="") as stream:
+        reader = csv.DictReader(stream)
+        return list(reader.fieldnames or []), list(reader)
+
+
+def snapshots_are_monotonic(snapshots: list[dict[str, int]]) -> bool:
+    if not snapshots or any(not MONOTONIC_FIELDS <= snapshot.keys()
+                            for snapshot in snapshots):
+        return False
+    return all(
+        current[field] >= previous[field]
+        for previous, current in zip(snapshots, snapshots[1:])
+        for field in MONOTONIC_FIELDS
+    )
+
+
+def p0_evidence_checks(evidence_dir: Path,
+                       snapshots: list[dict[str, int]],
+                       runtime_seconds: float) -> list[tuple[bool, str]]:
+    preflight_path = evidence_dir / "preflight.txt"
+    result_path = evidence_dir / "result.txt"
+    resources_path = evidence_dir / "resources.csv"
+    checks: list[tuple[bool, str]] = []
+
+    try:
+        preflight_text = preflight_path.read_text(
+            encoding="utf-8", errors="replace")
+        preflight = load_key_values(preflight_path)
+    except OSError:
+        preflight_text = ""
+        preflight = {}
+    checks.extend([
+        (preflight.get("schema") == "zero-sdr-p0-v4",
+         "recognized P0 preflight schema"),
+        (preflight.get("preflight") == "PASS",
+         "device preflight passed"),
+        (preflight.get("device_model", "").split(" path=", 1)[0] not in
+         {"", "missing"},
+         "device-tree model was recorded"),
+        (preflight.get("cardputerzero_overlay", "").split(" path=", 1)[0] in
+         {"cardputerzero-overlay", "cardputerzero-v3-overlay",
+          "cardputerzero-v5-overlay"},
+         "official Cardputer Zero device-tree overlay was active"),
+        (preflight.get("launcher_service") in {"active", "inactive"},
+         "APPLaunch user-service state was observed"),
+        (preflight.get("app_processes") == "0",
+         "no concurrent Zero SDR process at preflight"),
+        (preflight.get("plugdev_membership") == "present",
+         "normal user belongs to plugdev"),
+        (preflight.get("monitor_tools") == "ok",
+         "all evidence tools were available"),
+        (preflight.get("package", "").startswith("install ok installed ") and
+         preflight.get("package", "").endswith(" arm64"),
+         "ARM64 Zero SDR package was installed"),
+        (preflight.get("rtl_runtime_package", "").startswith(
+            "install ok installed "),
+         "RTL-SDR runtime package was installed"),
+        (preflight.get("rtl_udev_rule", "").startswith("valid path="),
+         "distribution RTL-SDR udev rule was valid"),
+        ("hostname=" not in preflight_text and
+         "serial=" not in preflight_text and
+         "network=" not in preflight_text,
+         "preflight excludes hostname, USB serial, and network data"),
+    ])
+
+    try:
+        result = load_key_values(result_path)
+    except OSError:
+        result = {}
+    requested_seconds = integer_value(result, "requested_seconds")
+    result_runtime = integer_value(result, "runtime_seconds")
+    sample_interval = integer_value(result, "sample_interval_seconds")
+    diagnostics_records = integer_value(result, "diagnostics_records")
+    launcher_was_active = integer_value(result, "launcher_was_active")
+    launcher_transition_ok = (
+        launcher_was_active == 1 and
+        result.get("launcher_stop_status") == "0" and
+        result.get("launcher_restart_status") == "0"
+    ) or (
+        launcher_was_active == 0 and
+        result.get("launcher_stop_status") == "not-needed" and
+        result.get("launcher_restart_status") == "not-needed"
+    )
+    expected_diagnostics = (
+        requested_seconds // P0_DIAGNOSTICS_INTERVAL_SECONDS
+        if requested_seconds is not None else 0
+    )
+    diagnostic_coverage = (
+        expected_diagnostics > 0 and
+        len(snapshots) >= max(2, int(expected_diagnostics * 0.8)) and
+        snapshots[0].get("uptime_ms", P0_RUNTIME_SECONDS * 1000) <=
+        P0_DIAGNOSTICS_INTERVAL_SECONDS * 2 * 1000 and
+        snapshots[-1].get("uptime_ms", 0) >= requested_seconds * 1000
+    )
+    checks.extend([
+        (result.get("schema") == "zero-sdr-p0-result-v2",
+         "recognized P0 result schema"),
+        (requested_seconds is not None and
+         requested_seconds >= P0_RUNTIME_SECONDS,
+         "evidence run requested at least 30 minutes"),
+        (result_runtime is not None and requested_seconds is not None and
+         result_runtime >= requested_seconds,
+         "runner stayed active for the requested duration"),
+        (result.get("duration_complete") == "1",
+         "runner marked the duration complete"),
+        (result.get("app_exit_status") == "0" and
+         result.get("forced_kill") == "0",
+         "app exited cleanly without a forced kill"),
+        (launcher_transition_ok,
+         "APPLaunch pause/restore transition completed correctly"),
+        (sample_interval is not None and 1 <= sample_interval <= 300,
+         "resource sampling interval was recorded"),
+        (diagnostics_records == len(snapshots),
+         "result diagnostics count matches app.log"),
+        (diagnostic_coverage,
+         "diagnostic records cover the requested run at the expected cadence"),
+        (snapshots_are_monotonic(snapshots),
+         "diagnostic uptime and cumulative counters are monotonic"),
+        (result_runtime is not None and sample_interval is not None and
+         abs(result_runtime - runtime_seconds) <= sample_interval + 15,
+         "runner and application runtimes agree"),
+    ])
+
+    try:
+        resource_fields, resource_rows = load_resource_rows(resources_path)
+    except (OSError, csv.Error):
+        resource_fields, resource_rows = [], []
+    resource_shape_ok = resource_fields == RESOURCE_FIELDS and bool(resource_rows)
+    elapsed_values: list[int] = []
+    resource_values_ok = resource_shape_ok
+    pids: set[int] = set()
+    if resource_shape_ok:
+        try:
+            for row in resource_rows:
+                pids.add(int(row["pid"]))
+                elapsed_values.append(int(row["elapsed_s"]))
+                float(row["cpu_percent"])
+                int(row["rss_kib"])
+                int(row["vsz_kib"])
+                if row["mem_available_kib"] != "unknown":
+                    int(row["mem_available_kib"])
+                if row["max_temp_millic"] != "unknown":
+                    int(row["max_temp_millic"])
+                if row["state"].startswith("Z"):
+                    resource_values_ok = False
+        except (KeyError, TypeError, ValueError):
+            resource_values_ok = False
+    resource_monotonic = (
+        bool(elapsed_values) and
+        elapsed_values == sorted(elapsed_values) and
+        len(pids) == 1
+    )
+    resource_coverage = (
+        bool(elapsed_values) and requested_seconds is not None and
+        elapsed_values[0] <= 5 and elapsed_values[-1] >= requested_seconds
+    )
+    expected_samples = (
+        requested_seconds // sample_interval
+        if requested_seconds is not None and sample_interval else 0
+    )
+    sample_count_ok = (
+        expected_samples > 0 and
+        len(resource_rows) >= max(2, int(expected_samples * 0.8))
+    )
+    checks.extend([
+        (resource_shape_ok, "resource CSV has the expected schema and samples"),
+        (resource_values_ok and resource_monotonic,
+         "resource samples are valid, ordered, and belong to one process"),
+        (resource_coverage,
+         "resource samples cover the requested run"),
+        (sample_count_ok,
+         "resource sample count is consistent with the interval"),
+    ])
+    return checks
 
 
 def p0_checks(metrics: dict[str, int], runtime_seconds: float,
@@ -74,16 +282,30 @@ def p0_checks(metrics: dict[str, int], runtime_seconds: float,
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Summarize structured diagnostics emitted by Zero SDR.")
-    parser.add_argument("log", help="application log path, or - for standard input")
+    parser.add_argument(
+        "input",
+        help="application log path, or a complete evidence directory with --p0")
     parser.add_argument(
         "--p0", action="store_true",
         help="enforce the 30-minute continuous-capture release gates")
     args = parser.parse_args()
 
+    if args.p0:
+        evidence_dir = Path(args.input)
+        if not evidence_dir.is_dir():
+            print("ERROR: --p0 requires the complete evidence directory, not only app.log",
+                  file=sys.stderr)
+            return 2
+        log_path = evidence_dir / "app.log"
+        log_input = str(log_path)
+    else:
+        evidence_dir = None
+        log_input = args.input
+
     try:
-        snapshots = load_snapshots(args.log)
+        snapshots = load_snapshots(log_input)
     except OSError as error:
-        print(f"ERROR: unable to read {args.log}: {error}", file=sys.stderr)
+        print(f"ERROR: unable to read {log_input}: {error}", file=sys.stderr)
         return 2
     if not snapshots:
         print("ERROR: no Zero SDR diagnostics records found", file=sys.stderr)
@@ -135,12 +357,19 @@ def main() -> int:
     if not args.p0:
         return 0
 
-    print("P0 continuous-capture checks")
-    checks = p0_checks(metrics, runtime_seconds, iq_rate,
-                       audio_written_rate, average_processing_us)
-    for passed, description in checks:
+    assert evidence_dir is not None
+    print("P0 evidence-integrity checks")
+    evidence_checks = p0_evidence_checks(
+        evidence_dir, snapshots, runtime_seconds)
+    for passed, description in evidence_checks:
         print(f"  {'PASS' if passed else 'FAIL'}: {description}")
-    passed = all(result for result, _ in checks)
+
+    print("P0 continuous-capture checks")
+    capture_checks = p0_checks(metrics, runtime_seconds, iq_rate,
+                               audio_written_rate, average_processing_us)
+    for passed, description in capture_checks:
+        print(f"  {'PASS' if passed else 'FAIL'}: {description}")
+    passed = all(result for result, _ in evidence_checks + capture_checks)
     print(f"Overall: {'PASS' if passed else 'FAIL'}")
     return 0 if passed else 1
 

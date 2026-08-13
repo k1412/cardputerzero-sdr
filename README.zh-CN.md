@@ -95,7 +95,7 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 
 应用默认每 30 秒向标准输出写入一条结构化 `diagnostics` 记录，其中包含累计连接/重试/读取错误、IQ 数据块与字节数、音频生成/写入/丢帧、ALSA 恢复与故障、DSP 处理耗时、界面循环次数和最大界面循环间隔。需要调整周期时，可将 `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` 设置为 100–3,600,000 毫秒。
 
-ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设备预检与证据采集工具。运行前不要留下另一个 Zero SDR 实例。先通过 SSH 或本地终端，以正常 APPLaunch 用户检查已安装的 ARM64 应用和 `librtlsdr0` 包、`plugdev` 成员资格、发行版维护的 RTL-SDR 规则、USB 高速链路、原生 320×170 帧缓冲、官方 APPLaunch/Cardputer 键盘路径、RTL-SDR USB 节点和可写 ALSA 播放节点：
+ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设备预检与证据采集工具。运行前不要留下另一个 Zero SDR 实例。先通过 SSH 或本地终端，以正常 APPLaunch 用户检查设备树型号与官方 Cardputer Zero overlay、已安装的 ARM64 应用和 `librtlsdr0` 包、`plugdev` 成员资格、发行版维护的 RTL-SDR 规则、USB 高速链路、原生 320×170 帧缓冲、官方 APPLaunch/Cardputer 键盘路径、RTL-SDR USB 节点和可写 ALSA 播放节点：
 
 ```sh
 cardputerzero-sdr-p0 --preflight-only
@@ -113,13 +113,13 @@ cardputerzero-sdr-p0 --duration 1800
 
 完整测试会先通过当前普通用户的 systemd 管理器暂停活动中的 `APPLaunch.service`，再启动 Zero SDR；测试完成、被中断或应用提前退出时都会恢复启动器。这样无需 root 即可遵循 APPLaunch 的帧缓冲独占约定，结果文件也会记录暂停和恢复状态。工具还会在发现已有 Zero SDR 进程时拒绝启动。
 
-工具会在 `$XDG_STATE_HOME/cardputerzero-sdr/evidence/`（或 `~/.local/state/`）下创建权限收紧的证据目录，保存经过隐私筛选的硬件/权限快照、`app.log`、进程 CPU/内存/温度采样和退出结果。它会拒绝 root 运行，不采集主机名、网络状态或 USB 序列号，并通过已经测试的 `SIGTERM` 正常清理路径停止应用。把证据目录复制到开发机上的项目仓库，再汇总应用日志：
+工具会在 `$XDG_STATE_HOME/cardputerzero-sdr/evidence/`（或 `~/.local/state/`）下创建权限收紧的证据目录，保存经过隐私筛选的硬件/权限快照、`app.log`、进程 CPU/内存/温度采样和退出结果。它会拒绝 root 运行，不采集主机名、网络状态或 USB 序列号，并通过已经测试的 `SIGTERM` 正常清理路径停止应用。把证据目录复制到开发机上的项目仓库，再执行整体审计：
 
 ```sh
-python3 scripts/summarize_diagnostics.py --p0 path/to/evidence/app.log
+python3 scripts/summarize_diagnostics.py --p0 path/to/evidence
 ```
 
-`--p0` 检查要求：连续运行至少 30 分钟、仅有一次无中断连接、RF/音频错误和丢帧均为零、IQ 吞吐在 4,096,000 字节/秒的 ±10% 内、未静音音频写入在 32,000 帧/秒的 ±10% 内，并且平均处理耗时小于每个 IQ 数据块 4,000 微秒的实时预算。最大单次处理耗时和界面循环间隔会被记录，用于建立实体设备基线，不会在没有实测数据时臆定发布阈值。完整步骤见[硬件测试计划](docs/DEVICE_TEST_PLAN.md)。
+`--p0` 会审计完整证据目录，而不是只信任 `app.log`。它会检查设备树身份、预检格式与隐私边界、已安装软件包、是否存在并发实例、应用是否正常退出、APPLaunch 是否正确暂停并恢复、诊断计数器是否单调、资源采样是否覆盖完整时段，以及 30 分钟连续接收门禁。连续接收要求：仅有一次无中断连接、RF/音频错误和丢帧均为零、IQ 吞吐在 4,096,000 字节/秒的 ±10% 内、未静音音频写入在 32,000 帧/秒的 ±10% 内，并且平均处理耗时小于每个 IQ 数据块 4,000 微秒的实时预算。最大单次处理耗时和界面循环间隔会被记录，用于建立实体设备基线，不会在没有实测数据时臆定发布阈值。完整步骤见[硬件测试计划](docs/DEVICE_TEST_PLAN.md)。
 
 ## Cardputer Zero 构建
 
@@ -129,7 +129,7 @@ python3 scripts/summarize_diagnostics.py --p0 path/to/evidence/app.log
 cmake --workflow --preset cp0-cross-package
 ```
 
-预期安装包：`dist/cardputerzero-sdr_0.1.0-4_arm64.deb`。
+预期安装包：`dist/cardputerzero-sdr_0.1.0-5_arm64.deb`。
 
 交叉编译成功不等同于实机验证。发布前必须完成[硬件测试计划](docs/DEVICE_TEST_PLAN.md)中的检查。
 

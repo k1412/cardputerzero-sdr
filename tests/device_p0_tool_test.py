@@ -51,7 +51,7 @@ package=""
 for package do :; done
 case "$package" in
     cardputerzero-sdr)
-        printf 'install ok installed 0.1.0-4 arm64'
+        printf 'install ok installed 0.1.0-5 arm64'
         ;;
     librtlsdr0)
         [ "${FAKE_RTL_PACKAGE_MISSING:-0}" = 0 ] || exit 1
@@ -107,6 +107,10 @@ esac
         write(launcher_state, "active\n")
 
         write(root / "etc/os-release", 'ID=debian\nVERSION_ID="13"\n')
+        write(sys_root / "firmware/devicetree/base/model",
+              "M5Stack Cardputer Zero\0")
+        boot_config = root / "boot/firmware/config.txt"
+        write(boot_config, "dtoverlay=cardputerzero-v5-overlay\n")
         write(sys_root / "class/graphics/fb0/name", "fake-fb\n")
         write(sys_root / "class/graphics/fb0/virtual_size", "320,170\n")
         write(sys_root / "class/graphics/fb0/bits_per_pixel", "16\n")
@@ -166,14 +170,16 @@ esac
         )
         assert result.returncode == 0, result.stdout + result.stderr
         report = (output / "preflight.txt").read_text(encoding="utf-8")
-        assert "schema=zero-sdr-p0-v3" in report
+        assert "schema=zero-sdr-p0-v4" in report
         assert "preflight=PASS" in report
         assert "os_id=debian" in report
         assert "os_version=13" in report
+        assert "device_model=M5Stack Cardputer Zero" in report
+        assert "cardputerzero_overlay=cardputerzero-v5-overlay" in report
         assert "plugdev_membership=present" in report
         assert "launcher_service=active" in report
         assert "app_processes=0" in report
-        assert "package=install ok installed 0.1.0-4 arm64" in report
+        assert "package=install ok installed 0.1.0-5 arm64" in report
         assert "rtl_runtime_package=install ok installed 2.0.2-2+b1 arm64" in report
         assert f"rtl_udev_rule=valid path={udev_rule}" in report
         assert "framebuffer_virtual_size=320,170" in report
@@ -267,6 +273,23 @@ esac
         assert not launcher_log.exists()
         write(launcher_state, "active\n")
 
+        boot_config.unlink()
+        missing_overlay_output = root / "missing-overlay-evidence"
+        result = subprocess.run(
+            [tool, "--preflight-only", "--output", str(missing_overlay_output)],
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        missing_overlay_report = (
+            missing_overlay_output / "preflight.txt"
+        ).read_text(encoding="utf-8")
+        assert "cardputerzero_overlay=missing" in missing_overlay_report
+        assert "preflight=FAIL" in missing_overlay_report
+        write(boot_config, "dtoverlay=cardputerzero-v5-overlay\n")
+
         missing_dependency_environment = dict(environment)
         missing_dependency_environment["FAKE_RTL_PACKAGE_MISSING"] = "1"
         missing_dependency_output = root / "missing-dependency-evidence"
@@ -348,6 +371,8 @@ esac
         assert result.returncode == 1, result.stdout + result.stderr
         short_result = (short_output / "result.txt").read_text(encoding="utf-8")
         assert "duration_complete=0" in short_result
+        assert "schema=zero-sdr-p0-result-v2" in short_result
+        assert "sample_interval_seconds=1" in short_result
         assert "app_exit_status=0" in short_result
         assert "forced_kill=0" in short_result
         assert "launcher_was_active=1" in short_result
