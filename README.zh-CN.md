@@ -87,7 +87,7 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 
 使用 `scripts/smoke_locales.sh` 可执行 50 项截图检查：十种语言各覆盖无线电、设置、直接调谐，以及无线电/设置页的音频故障状态。如只需截取直接调谐浮层，请从无线电页面启动并设置 `ZERO_SDR_DIRECT_ENTRY=103.9`。
 
-使用 `scripts/capture_demo_states.sh` 可生成可重复的离线演示、模拟设备 `LIVE`、`NO AUDIO`、直接调谐和 `NO DEVICE` 证据。
+使用 `scripts/capture_demo_states.sh` 可生成六种可重复的接收状态：离线演示、模拟设备 `LIVE`、设备上报的手动增益、`NO AUDIO`、直接调谐和 `NO DEVICE`。
 
 ## Cardputer Zero 构建
 

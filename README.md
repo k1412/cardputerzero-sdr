@@ -87,7 +87,7 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 
 Run 50 screenshot checks—radio, settings, direct tuning, and both radio/settings audio-failure states in all ten locales—with `scripts/smoke_locales.sh`. To capture only the direct-tuning overlay, start on the radio page and set `ZERO_SDR_DIRECT_ENTRY=103.9`.
 
-Generate reproducible offline demo, fake-device `LIVE`, `NO AUDIO`, direct-tuning, and `NO DEVICE` evidence with `scripts/capture_demo_states.sh`.
+Generate six reproducible receiver states—offline demo, fake-device `LIVE`, device-reported manual gain, `NO AUDIO`, direct tuning, and `NO DEVICE`—with `scripts/capture_demo_states.sh`.
 
 ## Cardputer Zero build
 

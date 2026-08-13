@@ -9,6 +9,12 @@ fake_asound="$build_dir/fake_asound.so"
 
 mkdir -p "$output_dir"
 
+manual_gain_config="$output_dir/config/manual-gain/cardputerzero-sdr/cardputerzero-sdr.conf"
+mkdir -p "$(dirname -- "$manual_gain_config")"
+sed -e 's/^automatic_gain=yes$/automatic_gain=no/' \
+    -e 's/^gain_tenths_db=192$/gain_tenths_db=-40/' \
+    config/cardputerzero-sdr.conf >"$manual_gain_config"
+
 capture() {
   local name="$1"
   shift
@@ -23,6 +29,10 @@ capture() {
 capture demo env ZERO_SDR_DEMO=1
 capture direct-tune env ZERO_SDR_DEMO=1 ZERO_SDR_DIRECT_ENTRY=103.9
 capture live env ZERO_SDR_LIVE=1 \
+  ZERO_SDR_RTLSDR_LIBRARY="$fake_rtlsdr" \
+  ZERO_SDR_ALSA_LIBRARY="$fake_asound"
+capture manual-gain env ZERO_SDR_LIVE=1 \
+  ZERO_SDR_START_PAGE=settings \
   ZERO_SDR_RTLSDR_LIBRARY="$fake_rtlsdr" \
   ZERO_SDR_ALSA_LIBRARY="$fake_asound"
 capture live-no-audio env ZERO_SDR_LIVE=1 \
