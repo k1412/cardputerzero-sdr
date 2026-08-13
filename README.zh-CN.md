@@ -25,6 +25,7 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 - 自动保存上次使用的频率、步进、增益、静音、主题和语言
 - 运行时加载 RTL-SDR、带信道滤波的 WFM 音频与自动重连
 - 每 30 秒输出结构化接收健康日志，记录 IQ、音频、DSP、重连和界面循环指标
+- 随包提供无需 root 的 P0 预检与限时证据采集工具，并对硬件/资源信息做隐私筛选
 - 经审计的 ARM64 Debian 安装包，内含固定版本的私有 librtlsdr 运行库
 - 仅针对已测试 Realtek RTL2832U USB ID 的 `plugdev`/`uaccess` 规则；不安装 root 服务
 - 十种界面语言：英语、简体中文、繁体中文、西班牙语、日语、韩语、法语、德语、巴西葡萄牙语和俄语
@@ -94,17 +95,22 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 
 应用默认每 30 秒向标准输出写入一条结构化 `diagnostics` 记录，其中包含累计连接/重试/读取错误、IQ 数据块与字节数、音频生成/写入/丢帧、ALSA 恢复与故障、DSP 处理耗时、界面循环次数和最大界面循环间隔。需要调整周期时，可将 `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` 设置为 100–3,600,000 毫秒。
 
-在设备上直接连续运行 30 分钟时，先保存标准输出：
+ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设备预检与证据采集工具。运行时不要同时从 APPLaunch 启动第二个 Zero SDR 实例。先通过 SSH 或本地终端，以正常 APPLaunch 用户检查帧缓冲、键盘、RTL-SDR USB 节点和 ALSA 权限：
 
 ```sh
-ZERO_SDR_DIAGNOSTICS_INTERVAL_MS=30000 cardputerzero-sdr \
-  2>&1 | tee zero-sdr-30m.log
+cardputerzero-sdr-p0 --preflight-only
 ```
 
-把日志复制到开发机上的项目仓库，再在开发机汇总最后一条累计记录：
+然后启动有时间边界的 30 分钟测试；运行期间可正常使用实体按键操作应用：
 
 ```sh
-python3 scripts/summarize_diagnostics.py --p0 zero-sdr-30m.log
+cardputerzero-sdr-p0 --duration 1800
+```
+
+工具会在 `$XDG_STATE_HOME/cardputerzero-sdr/evidence/`（或 `~/.local/state/`）下创建权限收紧的证据目录，保存经过隐私筛选的硬件/权限快照、`app.log`、进程 CPU/内存/温度采样和退出结果。它会拒绝 root 运行，不采集主机名、网络状态或 USB 序列号，并通过已经测试的 `SIGTERM` 正常清理路径停止应用。把证据目录复制到开发机上的项目仓库，再汇总应用日志：
+
+```sh
+python3 scripts/summarize_diagnostics.py --p0 path/to/evidence/app.log
 ```
 
 `--p0` 检查要求：连续运行至少 30 分钟、仅有一次无中断连接、RF/音频错误和丢帧均为零、IQ 吞吐在 4,096,000 字节/秒的 ±10% 内、未静音音频写入在 32,000 帧/秒的 ±10% 内，并且平均处理耗时小于每个 IQ 数据块 4,000 微秒的实时预算。最大单次处理耗时和界面循环间隔会被记录，用于建立实体设备基线，不会在没有实测数据时臆定发布阈值。完整步骤见[硬件测试计划](docs/DEVICE_TEST_PLAN.md)。

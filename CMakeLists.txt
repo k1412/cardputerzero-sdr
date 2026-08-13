@@ -809,6 +809,16 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
              COMMAND ${Python3_EXECUTABLE}
                      "${CMAKE_CURRENT_SOURCE_DIR}/tests/diagnostics_log_test.py"
                      "${CMAKE_CURRENT_SOURCE_DIR}/scripts/summarize_diagnostics.py")
+    add_test(NAME device_p0_tool
+             COMMAND ${Python3_EXECUTABLE}
+                     "${CMAKE_CURRENT_SOURCE_DIR}/tests/device_p0_tool_test.py"
+                     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/cardputerzero-sdr-p0")
+    if(UNIX)
+        add_test(NAME graceful_shutdown
+                 COMMAND ${Python3_EXECUTABLE}
+                         "${CMAKE_CURRENT_SOURCE_DIR}/tests/graceful_shutdown_test.py"
+                         $<TARGET_FILE:${PROJECT_NAME}>)
+    endif()
 endif()
 
 # Package deb

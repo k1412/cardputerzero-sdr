@@ -1,0 +1,347 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+
+# Collect a privacy-conscious Cardputer Zero hardware snapshot and, unless
+# --preflight-only is used, run a bounded Zero SDR P0 capture session.
+
+set -eu
+umask 077
+LC_ALL=C
+export LC_ALL
+
+duration=1800
+interval=30
+output=""
+preflight_only=0
+
+usage() {
+    cat <<'EOF'
+Usage: cardputerzero-sdr-p0 [options]
+
+Options:
+  --duration SECONDS  Capture duration (60-86400; default: 1800)
+  --interval SECONDS  Resource sampling interval (1-300; default: 30)
+  --output DIRECTORY  New evidence directory to create
+  --preflight-only    Collect hardware/access facts without starting the app
+  --help              Show this help
+
+The report intentionally excludes hostname, network state, and USB serials.
+Run as the same non-root user that launches APPLaunch applications.
+EOF
+}
+
+is_uint() {
+    case "$1" in
+        ''|*[!0-9]*) return 1 ;;
+        *) return 0 ;;
+    esac
+}
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --duration)
+            [ "$#" -ge 2 ] || { echo "missing value for --duration" >&2; exit 2; }
+            duration=$2
+            shift 2
+            ;;
+        --interval)
+            [ "$#" -ge 2 ] || { echo "missing value for --interval" >&2; exit 2; }
+            interval=$2
+            shift 2
+            ;;
+        --output)
+            [ "$#" -ge 2 ] || { echo "missing value for --output" >&2; exit 2; }
+            output=$2
+            shift 2
+            ;;
+        --preflight-only)
+            preflight_only=1
+            shift
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "unknown option: $1" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
+
+is_uint "$duration" && [ "$duration" -ge 60 ] && [ "$duration" -le 86400 ] || {
+    echo "--duration must be an integer from 60 to 86400" >&2
+    exit 2
+}
+is_uint "$interval" && [ "$interval" -ge 1 ] && [ "$interval" -le 300 ] || {
+    echo "--interval must be an integer from 1 to 300" >&2
+    exit 2
+}
+
+if [ "$(id -u)" -eq 0 ]; then
+    echo "refusing to run as root; use the APPLaunch user" >&2
+    exit 2
+fi
+
+sys_root=${ZERO_SDR_P0_SYS_ROOT:-/sys}
+dev_root=${ZERO_SDR_P0_DEV_ROOT:-/dev}
+proc_root=${ZERO_SDR_P0_PROC_ROOT:-/proc}
+app_command=${ZERO_SDR_P0_APP:-cardputerzero-sdr}
+
+if [ -z "$output" ]; then
+    state_root=${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}
+    output="$state_root/cardputerzero-sdr/evidence/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+fi
+case "$output" in
+    /|.) echo "refusing unsafe output directory: $output" >&2; exit 2 ;;
+esac
+if [ -e "$output" ]; then
+    echo "output directory already exists: $output" >&2
+    exit 2
+fi
+mkdir -p "$output"
+
+report="$output/preflight.txt"
+preflight_ok=1
+
+read_trimmed() {
+    if [ -r "$1" ]; then
+        tr '\n\r' '  ' <"$1" | sed 's/[[:space:]][[:space:]]*/ /g; s/^ //; s/ $//'
+    fi
+}
+
+access_text() {
+    if [ ! -e "$1" ]; then
+        printf 'missing'
+    elif [ -r "$1" ] && [ -w "$1" ]; then
+        printf 'read-write'
+    elif [ -r "$1" ]; then
+        printf 'read-only'
+    else
+        printf 'denied'
+    fi
+}
+
+mode_text() {
+    stat -c '%a:%u:%g' "$1" 2>/dev/null || printf 'unknown'
+}
+
+os_value() {
+    [ -r "$sys_root/../etc/os-release" ] || return 0
+    awk -F= -v wanted="$1" '$1 == wanted {value=$0; sub(/^[^=]*=/, "", value); gsub(/^"|"$/, "", value); print value; exit}' \
+        "$sys_root/../etc/os-release"
+}
+
+app_path=$(command -v "$app_command" 2>/dev/null || true)
+monitor_tools=ok
+for required_tool in awk grep ps sed stat tr; do
+    if ! command -v "$required_tool" >/dev/null 2>&1; then
+        monitor_tools="missing-$required_tool"
+        preflight_ok=0
+        break
+    fi
+done
+
+{
+    echo "schema=zero-sdr-p0-v1"
+    echo "created_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "kernel=$(uname -srmo 2>/dev/null || echo unavailable)"
+    echo "os_id=$(os_value ID)"
+    echo "os_version=$(os_value VERSION_ID)"
+    echo "uid=$(id -u)"
+    echo "gid=$(id -g)"
+    echo "monitor_tools=$monitor_tools"
+    if command -v dpkg-query >/dev/null 2>&1; then
+        echo "package=$(dpkg-query -W -f='${Status} ${Version} ${Architecture}' cardputerzero-sdr 2>/dev/null || echo not-installed)"
+    else
+        echo "package=dpkg-query-unavailable"
+    fi
+    if [ -n "$app_path" ]; then
+        echo "app_path=$app_path"
+        if command -v sha256sum >/dev/null 2>&1; then
+            echo "app_sha256=$(sha256sum "$app_path" | awk '{print $1}')"
+        fi
+    else
+        echo "app_path=missing"
+        preflight_ok=0
+    fi
+
+    framebuffer="$dev_root/fb0"
+    echo "framebuffer=$framebuffer access=$(access_text "$framebuffer") mode=$(mode_text "$framebuffer")"
+    [ -r "$framebuffer" ] && [ -w "$framebuffer" ] || preflight_ok=0
+    for attribute in name virtual_size bits_per_pixel; do
+        value=$(read_trimmed "$sys_root/class/graphics/fb0/$attribute")
+        [ -z "$value" ] || echo "framebuffer_$attribute=$value"
+    done
+
+    input_count=0
+    input_readable=0
+    for event_path in "$sys_root"/class/input/event*; do
+        [ -e "$event_path" ] || continue
+        event_name=${event_path##*/}
+        input_name=$(read_trimmed "$event_path/device/name")
+        input_keys=$(read_trimmed "$event_path/device/capabilities/key")
+        input_node="$dev_root/input/$event_name"
+        echo "input_event=$event_name name=$input_name access=$(access_text "$input_node") mode=$(mode_text "$input_node") keys=$input_keys"
+        input_count=$((input_count + 1))
+        [ -r "$input_node" ] && input_readable=$((input_readable + 1))
+    done
+    echo "input_events=$input_count readable=$input_readable"
+    [ "$input_readable" -gt 0 ] || preflight_ok=0
+
+    rtl_count=0
+    rtl_accessible=0
+    for usb_path in "$sys_root"/bus/usb/devices/*; do
+        [ -r "$usb_path/idVendor" ] && [ -r "$usb_path/idProduct" ] || continue
+        vendor=$(read_trimmed "$usb_path/idVendor")
+        product=$(read_trimmed "$usb_path/idProduct")
+        case "$vendor:$product" in
+            0bda:2832|0bda:2838) ;;
+            *) continue ;;
+        esac
+        busnum=$(read_trimmed "$usb_path/busnum")
+        devnum=$(read_trimmed "$usb_path/devnum")
+        usb_node="missing"
+        if is_uint "$busnum" && is_uint "$devnum"; then
+            usb_node=$(printf '%s/bus/usb/%03d/%03d' "$dev_root" "$busnum" "$devnum")
+        fi
+        usb_driver=none
+        if [ -L "$usb_path/driver" ]; then
+            usb_driver=$(basename "$(readlink "$usb_path/driver")")
+        fi
+        echo "rtl_usb=$vendor:$product bus=$busnum device=$devnum access=$(access_text "$usb_node") mode=$(mode_text "$usb_node") driver=$usb_driver speed=$(read_trimmed "$usb_path/speed") max_power=$(read_trimmed "$usb_path/bMaxPower") runtime=$(read_trimmed "$usb_path/power/runtime_status")"
+        rtl_count=$((rtl_count + 1))
+        [ -r "$usb_node" ] && [ -w "$usb_node" ] && rtl_accessible=$((rtl_accessible + 1))
+    done
+    echo "rtl_devices=$rtl_count accessible=$rtl_accessible"
+    [ "$rtl_accessible" -gt 0 ] || preflight_ok=0
+
+    if [ -s "$proc_root/asound/cards" ]; then
+        echo "alsa_cards=present"
+        sed -n '1,20{s/^/alsa: /; p;}' "$proc_root/asound/cards"
+    else
+        echo "alsa_cards=missing"
+        preflight_ok=0
+    fi
+    if [ -r "$proc_root/asound/pcm" ]; then
+        sed -n '1,20{s/^/alsa_pcm: /; p;}' "$proc_root/asound/pcm"
+    fi
+
+    if [ -r "$proc_root/meminfo" ]; then
+        awk '/^(MemTotal|MemAvailable):/ {key=$1; sub(/:$/, "", key); print "memory_" tolower(key) "=" $2 " kB"}' \
+            "$proc_root/meminfo"
+    fi
+    for zone_path in "$sys_root"/class/thermal/thermal_zone*; do
+        [ -e "$zone_path" ] || continue
+        echo "thermal_zone=${zone_path##*/} type=$(read_trimmed "$zone_path/type") temp_millic=$(read_trimmed "$zone_path/temp")"
+    done
+} >"$report"
+
+if [ "$preflight_ok" -eq 1 ]; then
+    echo "preflight=PASS" >>"$report"
+else
+    echo "preflight=FAIL" >>"$report"
+fi
+
+echo "wrote $report"
+if [ "$preflight_only" -eq 1 ]; then
+    [ "$preflight_ok" -eq 1 ]
+    exit $?
+fi
+if [ "$preflight_ok" -ne 1 ]; then
+    echo "preflight failed; app was not started" >&2
+    exit 1
+fi
+
+resources="$output/resources.csv"
+app_log="$output/app.log"
+result="$output/result.txt"
+echo "epoch,pid,state,elapsed_s,cpu_percent,rss_kib,vsz_kib,mem_available_kib,max_temp_millic" >"$resources"
+
+ZERO_SDR_DIAGNOSTICS_INTERVAL_MS=30000 "$app_path" >"$app_log" 2>&1 &
+app_pid=$!
+started_epoch=$(date +%s)
+completed=0
+stop_requested=0
+
+request_stop() {
+    stop_requested=1
+}
+trap request_stop INT TERM HUP
+
+while kill -0 "$app_pid" 2>/dev/null; do
+    now=$(date +%s)
+    elapsed=$((now - started_epoch))
+    process_values=$(ps -p "$app_pid" -o stat= -o etimes= -o pcpu= -o rss= -o vsz= 2>/dev/null | awk 'NR == 1 {print $1 "," $2 "," $3 "," $4 "," $5}')
+    [ -n "$process_values" ] || break
+    process_state=${process_values%%,*}
+    case "$process_state" in
+        Z*) break ;;
+    esac
+    mem_available=$(awk '/^MemAvailable:/ {print $2; exit}' "$proc_root/meminfo" 2>/dev/null || true)
+    max_temp=""
+    for zone_path in "$sys_root"/class/thermal/thermal_zone*; do
+        temp=$(read_trimmed "$zone_path/temp")
+        is_uint "$temp" || continue
+        if [ -z "$max_temp" ] || [ "$temp" -gt "$max_temp" ]; then
+            max_temp=$temp
+        fi
+    done
+    echo "$now,$app_pid,$process_values,${mem_available:-unknown},${max_temp:-unknown}" >>"$resources"
+
+    if [ "$stop_requested" -eq 1 ]; then
+        break
+    fi
+    if [ "$elapsed" -ge "$duration" ]; then
+        completed=1
+        break
+    fi
+    sleep_for=$interval
+    remaining=$((duration - elapsed))
+    [ "$remaining" -ge "$sleep_for" ] || sleep_for=$remaining
+    [ "$sleep_for" -gt 0 ] || sleep_for=1
+    sleep "$sleep_for"
+done
+
+forced_kill=0
+if kill -0 "$app_pid" 2>/dev/null; then
+    kill -TERM "$app_pid" 2>/dev/null || true
+    shutdown_deadline=$(($(date +%s) + 10))
+    while kill -0 "$app_pid" 2>/dev/null; do
+        shutdown_state=$(ps -p "$app_pid" -o stat= 2>/dev/null | awk 'NR == 1 {print $1}')
+        case "$shutdown_state" in
+            ''|Z*) break ;;
+        esac
+        if [ "$(date +%s)" -ge "$shutdown_deadline" ]; then
+            kill -KILL "$app_pid" 2>/dev/null || true
+            forced_kill=1
+            break
+        fi
+        sleep 1
+    done
+fi
+app_status=0
+wait "$app_pid" || app_status=$?
+ended_epoch=$(date +%s)
+
+{
+    echo "schema=zero-sdr-p0-result-v1"
+    echo "started_epoch=$started_epoch"
+    echo "ended_epoch=$ended_epoch"
+    echo "runtime_seconds=$((ended_epoch - started_epoch))"
+    echo "requested_seconds=$duration"
+    echo "duration_complete=$completed"
+    echo "app_exit_status=$app_status"
+    echo "forced_kill=$forced_kill"
+    echo "diagnostics_records=$(grep -c 'diagnostics ' "$app_log" 2>/dev/null || true)"
+} >"$result"
+
+echo "evidence directory: $output"
+echo "copy it to the development checkout and run:"
+echo "python3 scripts/summarize_diagnostics.py --p0 $output/app.log"
+
+if [ "$completed" -ne 1 ] || [ "$app_status" -ne 0 ]; then
+    exit 1
+fi
+exit 0

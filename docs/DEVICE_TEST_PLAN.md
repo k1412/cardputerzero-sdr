@@ -43,17 +43,22 @@ This establishes the dongle baseline only. It does not prove Cardputer Zero USB-
 
 ## 30-minute continuous-capture evidence
 
-Run this separately from hot-plug and failure-injection tests so intentional reconnects do not contaminate the continuous-run counters. Keep audio unmuted on a known WFM station, capture the app's standard output, and retain the complete log:
+Run this separately from hot-plug and failure-injection tests so intentional reconnects do not contaminate the continuous-run counters. Do not run another Zero SDR instance from APPLaunch at the same time. As the normal non-root APPLaunch user, collect the access snapshot first:
 
 ```sh
-ZERO_SDR_DIAGNOSTICS_INTERVAL_MS=30000 cardputerzero-sdr \
-  2>&1 | tee zero-sdr-30m.log
+cardputerzero-sdr-p0 --preflight-only
 ```
 
-Copy the log into a repository checkout on the development machine, then run:
+The preflight must report `preflight=PASS`; inspect its framebuffer, input-event, RTL-SDR node, and ALSA facts rather than bypassing a failure with root. Keep audio unmuted on a known WFM station, then start the evidence run and exercise the physical controls while it remains active:
 
 ```sh
-python3 scripts/summarize_diagnostics.py --p0 zero-sdr-30m.log
+cardputerzero-sdr-p0 --duration 1800
+```
+
+The runner writes a mode-0700 evidence directory containing `preflight.txt`, `app.log`, `resources.csv`, and `result.txt`; the default location is below `$XDG_STATE_HOME/cardputerzero-sdr/evidence/` or `~/.local/state/`. It excludes hostname, network state, and USB serials. Copy that directory into a repository checkout on the development machine, then run:
+
+```sh
+python3 scripts/summarize_diagnostics.py --p0 path/to/evidence/app.log
 ```
 
 The expected RF input is 2.048 million complex samples/s at two unsigned bytes per sample, or 4,096,000 bytes/s. A 16,384-byte input block represents 8,192 complex samples and 4,000 µs of RF time, so average spectrum plus demodulation work must stay below 4,000 µs/block. Unmuted WFM output should approach 32,000 mono frames/s. The automated P0 evaluation requires:
@@ -72,6 +77,6 @@ Retain `max_processing_us` and `max_ui_gap_ms` in the evidence. They expose sche
 - Device model/OS image and kernel version
 - Dongle tuner/USB ID and whether external power was used
 - `.deb` checksum
-- 30-minute capture log, `summarize_diagnostics.py --p0` output, and resource measurements
+- `cardputerzero-sdr-p0` preflight/result, 30-minute app log, resource CSV, and `summarize_diagnostics.py --p0` output
 - Photos or native screenshots of both pages
 - Completed table above with issue links for any waiver

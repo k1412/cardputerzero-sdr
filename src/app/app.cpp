@@ -16,6 +16,7 @@
 
 #include <array>
 #include <cerrno>
+#include <csignal>
 #include <cstdlib>
 #include <filesystem>
 #include <limits>
@@ -51,6 +52,12 @@
 
 namespace app {
 namespace {
+
+volatile std::sig_atomic_t termination_requested = 0;
+
+void termination_signal_handler(int) {
+    termination_requested = 1;
+}
 
 void quit_requested_observer(lv_observer_t* observer, lv_subject_t* subject) {
     auto* running = static_cast<bool*>(lv_observer_get_user_data(observer));
@@ -285,6 +292,13 @@ int Application::run() {
                                                   quit_requested_observer,
                                                   &running);
 
+    termination_requested = 0;
+    const auto sigint_result = std::signal(SIGINT, termination_signal_handler);
+    const auto sigterm_result = std::signal(SIGTERM, termination_signal_handler);
+    if (sigint_result == SIG_ERR || sigterm_result == SIG_ERR) {
+        LOG_WARN("unable to install one or more termination signal handlers");
+    }
+
     LOG_INFO("LVGL app started at {}x{}", lv_display_get_horizontal_resolution(display),
              lv_display_get_vertical_resolution(display));
     const uint32_t diagnostics_interval = diagnostics_interval_ms();
@@ -303,6 +317,7 @@ int Application::run() {
 #if USE_DESKTOP
            && simulator_frame.process_events()
 #endif
+           && !termination_requested
     ) {
         view_model.poll_radio_session();
         const uint32_t now = lv_tick_get();
@@ -351,6 +366,10 @@ int Application::run() {
         }
 #endif
         lv_delay_ms(5);
+    }
+
+    if (termination_requested) {
+        LOG_INFO("termination signal received; shutting down cleanly");
     }
 
     if (quit_observer) {

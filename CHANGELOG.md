@@ -23,6 +23,8 @@ All notable changes will be documented here. The project follows Semantic Versio
 - XDG-scoped mutable settings so desktop use and screenshot automation never rewrite repository/package defaults
 - Structured receiver-health telemetry plus an automated 30-minute P0 log summarizer
 - Muted/unavailable-audio WFM bypass to preserve device CPU budget without stopping RF visualization
+- Non-root Cardputer Zero P0 preflight/resource collector with privacy-filtered release evidence
+- Graceful `SIGINT`/`SIGTERM` shutdown through the normal receiver and audio cleanup path
 
 ### Known limitations
 

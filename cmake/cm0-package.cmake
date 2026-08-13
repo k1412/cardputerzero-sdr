@@ -32,6 +32,9 @@ endif()
 install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
+install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/cardputerzero-sdr-p0"
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
 
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/cardputerzero-sdr.conf"
     DESTINATION "/etc"

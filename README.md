@@ -25,6 +25,7 @@ Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. 
 - Last-used frequency, tuning step, gain, mute, theme, and language persist across launches
 - Runtime-loaded RTL-SDR capture, channel-filtered WFM audio, and automatic reconnect
 - Structured 30-second receiver-health logs for IQ, audio, DSP, reconnect, and UI-loop measurements
+- Packaged non-root P0 preflight and bounded evidence runner with privacy-filtered hardware/resource facts
 - Audited ARM64 Debian package with a private pinned librtlsdr runtime
 - Narrow `plugdev`/`uaccess` rules for the tested Realtek RTL2832U USB IDs; no root service
 - Ten UI languages: English, Simplified Chinese, Traditional Chinese, Spanish, Japanese, Korean, French, German, Brazilian Portuguese, and Russian
@@ -94,17 +95,22 @@ Generate six reproducible receiver states—offline demo, fake-device `LIVE`, de
 
 The app writes one structured `diagnostics` record to standard output every 30 seconds. Each record contains cumulative connection/retry/read-error counts, IQ blocks and bytes, audio generated/written/dropped frames, ALSA recovery/failure counts, DSP processing time, UI-loop count, and maximum UI-loop gap. Set `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` to a value from 100 to 3,600,000 when a different interval is needed.
 
-For a direct 30-minute device run, capture stdout:
+The ARM64 package installs `cardputerzero-sdr-p0`, a non-root preflight and evidence runner. Do not launch a second Zero SDR instance from APPLaunch at the same time. From an SSH or local shell as the normal APPLaunch user, first verify framebuffer, keyboard, RTL-SDR USB-node, and ALSA access:
 
 ```sh
-ZERO_SDR_DIAGNOSTICS_INTERVAL_MS=30000 cardputerzero-sdr \
-  2>&1 | tee zero-sdr-30m.log
+cardputerzero-sdr-p0 --preflight-only
 ```
 
-Copy the log to a development checkout, then summarize its final cumulative record on the development machine:
+Then run the bounded 30-minute session and use the physical controls normally while it is active:
 
 ```sh
-python3 scripts/summarize_diagnostics.py --p0 zero-sdr-30m.log
+cardputerzero-sdr-p0 --duration 1800
+```
+
+The runner creates a private evidence directory below `$XDG_STATE_HOME/cardputerzero-sdr/evidence/` (or `~/.local/state/`). It stores a sanitized hardware/access snapshot, `app.log`, process CPU/memory/temperature samples, and the exit result. It refuses root, excludes hostname/network state/USB serials, and stops the app through its tested clean `SIGTERM` path. Copy the evidence directory to a development checkout, then summarize the app log on the development machine:
+
+```sh
+python3 scripts/summarize_diagnostics.py --p0 path/to/evidence/app.log
 ```
 
 The `--p0` check requires at least 30 minutes, one uninterrupted connection, zero RF/audio errors or drops, IQ throughput within 10% of 4,096,000 bytes/s, unmuted audio output within 10% of 32,000 frames/s, and average processing below the 4,000 µs IQ-block budget. Maximum processing and UI-loop gaps are reported for the physical-device baseline but are not guessed release thresholds. See [the hardware test plan](docs/DEVICE_TEST_PLAN.md) for the complete procedure.

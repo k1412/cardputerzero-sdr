@@ -60,12 +60,18 @@ jobs:
             exit 1
           fi
           grep -q '/usr/bin/cardputerzero-sdr$' /tmp/package-contents.txt
+          grep -q '/usr/bin/cardputerzero-sdr-p0$' /tmp/package-contents.txt
           grep -q '/etc/cardputerzero-sdr.conf$' /tmp/package-contents.txt
           grep -q '/lib/udev/rules.d/60-cardputerzero-sdr-rtlsdr.rules$' /tmp/package-contents.txt
           grep -q '/usr/lib/cardputerzero-sdr/librtlsdr.so.2.0.3$' /tmp/package-contents.txt
           grep -q '/usr/share/doc/cardputerzero-sdr/README.md$' /tmp/package-contents.txt
           grep -q '/usr/share/doc/cardputerzero-sdr/README.zh-CN.md$' /tmp/package-contents.txt
           grep -q '/usr/share/doc/cardputerzero-sdr/librtlsdr-GPL-2.0-or-later.txt$' /tmp/package-contents.txt
+          package_root=$(mktemp -d)
+          dpkg-deb -x "$package" "$package_root"
+          test -x "$package_root/usr/bin/cardputerzero-sdr-p0"
+          sh -n "$package_root/usr/bin/cardputerzero-sdr-p0"
+          "$package_root/usr/bin/cardputerzero-sdr-p0" --help | grep -q 'preflight-only'
           control_dir=$(mktemp -d)
           dpkg-deb -e "$package" "$control_dir"
           test -x "$control_dir/postinst"
