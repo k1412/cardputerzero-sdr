@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Private security report
+    url: https://github.com/k1412/cardputerzero-sdr/security/advisories/new
+    about: Report vulnerabilities without exposing device or user data publicly.

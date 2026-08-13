@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a Cardputer Zero-native interaction or radio capability.
+title: "feature: "
+body:
+  - type: textarea
+    id: use_case
+    attributes:
+      label: Cardputer Zero use case
+      description: Describe when and why this is useful on the physical device.
+    validations:
+      required: true
+  - type: textarea
+    id: interaction
+    attributes:
+      label: Physical-key interaction
+      description: Explain the keys, on-screen feedback, cancel path, and boundary behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Hardware or DSP constraints
+      description: Include CPU, memory, USB, audio, RF, power, or localization considerations when relevant.
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Proposed acceptance checks
+      description: List deterministic host tests and any required physical-device evidence.
+    validations:
+      required: true

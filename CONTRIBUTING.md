@@ -10,7 +10,7 @@ cmake --build --preset linux-x86-64-dbg
 ctest --test-dir build/linux-x86-64 -C Debug --output-on-failure
 ```
 
-For UI changes, attach a native 320×170 screenshot and verify at least English, Simplified Chinese, Japanese, Korean, and Russian. For radio/DSP changes, add deterministic vectors or recorded-data fixtures that can run without hardware.
+For UI changes, attach a native 320×170 screenshot and run `scripts/smoke_locales.sh`, which renders radio, settings, and direct-tuning states in all ten locales. For radio/DSP changes, add deterministic vectors or recorded-data fixtures that can run without hardware.
 
 Keep hardware access out of LVGL callbacks, keep queues bounded, and document measurements instead of guessing device capacity. Do not commit dongle serials, USB traces containing unrelated devices, credentials, build outputs, or fetched dependency trees.
 

@@ -1,0 +1,71 @@
+name: Bug report
+description: Report a reproducible UI, SDR, audio, packaging, or hardware problem.
+title: "bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Zero SDR. Do not paste credentials, unrelated USB traces, or a dongle serial number.
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Physical Cardputer Zero
+        - Linux desktop simulator
+        - macOS desktop simulator
+        - Windows desktop simulator
+        - Cross-build or package inspection
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0 or git commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware and OS image
+      description: For device bugs include Cardputer Zero OS/kernel, RTL-SDR tuner and USB VID:PID, audio route, and external-power use. Omit serial numbers.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: |
+        1. Launch Zero SDR with...
+        2. Press...
+        3. Observe...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs, screenshots, and measurements
+      description: Redact credentials, home paths if sensitive, IP addresses, and USB serials before attaching evidence.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I reproduced this on the commit/version above.
+          required: true
+        - label: I removed credentials and unique device serial numbers.
+          required: true
