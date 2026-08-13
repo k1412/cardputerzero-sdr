@@ -95,7 +95,8 @@ bool validate_config(const ApplicationConfig& config, std::string& error) {
         error = "tuning_step_index is outside the supported range";
         return false;
     }
-    if (config.gain_tenths_db < 0 || config.gain_tenths_db > 490) {
+    if (config.gain_tenths_db < ApplicationConfig::kMinimumGainTenthsDb ||
+        config.gain_tenths_db > ApplicationConfig::kMaximumGainTenthsDb) {
         error = "gain_tenths_db is outside the supported range";
         return false;
     }
@@ -181,7 +182,8 @@ bool load_application_config(const std::string& path,
         }
         else if (section == "application" && key == "gain_tenths_db") {
             if (!parse_integer(line.substr(separator + 1), config.gain_tenths_db) ||
-                config.gain_tenths_db < 0 || config.gain_tenths_db > 490) {
+                config.gain_tenths_db < ApplicationConfig::kMinimumGainTenthsDb ||
+                config.gain_tenths_db > ApplicationConfig::kMaximumGainTenthsDb) {
                 error = "invalid gain_tenths_db value at line " + std::to_string(line_number);
                 return false;
             }

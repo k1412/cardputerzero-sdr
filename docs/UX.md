@@ -22,6 +22,7 @@ Long device states use ellipsis. Settings values have a fixed right-aligned colu
 - Tuning never wraps from the upper bound to the lower bound.
 - Direct entry rejects malformed or out-of-range values instead of silently clamping them.
 - Step selection wraps because it is a small, reversible list.
+- Manual gain cycles through the connected tuner's reported discrete values, with `AUTO` as an adjacent reversible choice; arbitrary unsupported dB values are never sent to hardware.
 - Settings row selection wraps for fast one-handed use.
 - Esc from settings returns to radio; Esc from radio exits to the launcher.
 - Linux `EV_KEY=2` repeats are ignored for Enter/Esc, step selection, direct entry, and G/M/L/T toggles so a held key cannot oscillate pages or values.

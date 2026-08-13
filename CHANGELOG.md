@@ -19,6 +19,8 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Narrow udev permissions for Realtek RTL2832U `0bda:2832/2838` without a root service
 - Graceful audio-only degradation with translated `NO AUDIO` feedback while RF and spectrum remain live
 - Context-aware key-repeat policy that prevents held discrete keys from toggling values or pages repeatedly
+- Device-reported discrete tuner gain profiles with nearest-value enforcement and full FC0012 negative-gain support
+- XDG-scoped mutable settings so desktop use and screenshot automation never rewrite repository/package defaults
 
 ### Known limitations
 

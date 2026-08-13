@@ -5,6 +5,7 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace model {
 
@@ -26,6 +27,8 @@ public:
     static constexpr uint32_t kMinimumFrequencyHz = 22'000'000;
     static constexpr uint32_t kMaximumFrequencyHz = 948'600'000;
     static constexpr uint32_t kDefaultFrequencyHz = 97'400'000;
+    static constexpr int kMinimumGainTenthsDb = -100;
+    static constexpr int kMaximumGainTenthsDb = 500;
     static constexpr std::array<uint32_t, 6> kTuningStepsHz = {
         10'000,
         50'000,
@@ -50,6 +53,8 @@ public:
 
     bool automatic_gain() const;
     int gain_tenths_db() const;
+    const std::vector<int>& gain_steps_tenths_db() const;
+    void set_supported_gains(std::vector<int> gains_tenths_db);
     void set_gain(bool automatic_gain, int gain_tenths_db);
     void toggle_gain_mode();
     void adjust_gain(int direction);
@@ -74,7 +79,8 @@ private:
     size_t tuning_step_index_{3};
     bool muted_{false};
     bool automatic_gain_{true};
-    int gain_tenths_db_{200};
+    int gain_tenths_db_{192};
+    std::vector<int> gain_steps_tenths_db_{-99, -40, 71, 179, 192};
     bool dark_mode_{true};
     AppPage current_page_{AppPage::Radio};
     SourceState source_state_{SourceState::Demo};

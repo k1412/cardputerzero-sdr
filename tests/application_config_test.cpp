@@ -36,6 +36,11 @@ int main(int argc, char** argv) {
     assert(loaded.gain_tenths_db == 190);
     assert(loaded.muted);
 
+    written.gain_tenths_db = -99;
+    assert(app::save_application_config(config_path.string(), written, error));
+    assert(app::load_application_config(config_path.string(), loaded, error));
+    assert(loaded.gain_tenths_db == -99);
+
     {
         std::ofstream invalid(config_path, std::ios::trunc);
         invalid << "[application]\nlocale=../bad\n";
@@ -57,7 +62,7 @@ int main(int argc, char** argv) {
     assert(!app::load_application_config(config_path.string(), loaded, error));
     assert(error.find("invalid frequency_hz") != std::string::npos);
 
-    written.gain_tenths_db = 500;
+    written.gain_tenths_db = 501;
     assert(!app::save_application_config(config_path.string(), written, error));
     assert(error.find("gain_tenths_db") != std::string::npos);
 

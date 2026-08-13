@@ -87,7 +87,7 @@ void SettingsScreen::adjust_selection(int direction) {
     switch (selected_row_) {
         case 0: view_model().cycle_locale(direction); break;
         case 1: view_model().toggle_dark_mode(); break;
-        case 2: view_model().toggle_gain_mode(); break;
+        case 2: view_model().adjust_gain(direction); break;
         case 3: view_model().toggle_muted(); break;
         default: break;
     }

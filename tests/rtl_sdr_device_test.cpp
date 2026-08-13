@@ -31,8 +31,13 @@ int main(int argc, char** argv) {
     assert(!error.empty());
     assert(radio.open(0, error));
     assert(radio.is_open());
+    const auto gains = radio.tuner_gains(error);
+    assert((gains == std::vector<int>{-99, -40, 71, 179, 192}));
     assert(radio.configure(97'400'000, 2'048'000, true, 200, error));
-    assert(radio.set_gain(false, 190, error));
+    // The wrapper must snap arbitrary user/config values to a gain reported by
+    // the tuner. The fake rejects unsupported values, so 180 can only pass
+    // after normalization to 17.9 dB.
+    assert(radio.set_gain(false, 180, error));
     assert(radio.set_center_frequency(103'900'000, error));
 
     std::array<uint8_t, 16'384> samples{};

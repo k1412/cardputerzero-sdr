@@ -34,6 +34,7 @@ public:
     bool open(uint32_t index, std::string& error);
     void close();
     bool is_open() const;
+    std::vector<int> tuner_gains(std::string& error) const;
 
     bool configure(uint32_t center_frequency_hz,
                    uint32_t sample_rate_hz,

@@ -21,7 +21,7 @@ Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. 
 - Direct MHz entry from the number row with decimal, backspace, Enter, and Esc handling
 - Frequency clamp matching the tested FC0012 dongle: 22.0–948.6 MHz
 - Six tuning steps from 10 kHz to 1 MHz
-- Automatic/manual gain state, mute state, dark/light theme
+- Automatic gain plus device-reported manual gain steps, mute state, dark/light theme
 - Last-used frequency, tuning step, gain, mute, theme, and language persist across launches
 - Runtime-loaded RTL-SDR capture, channel-filtered WFM audio, and automatic reconnect
 - Audited ARM64 Debian package with a private pinned librtlsdr runtime
@@ -35,6 +35,8 @@ Not implemented or verified yet:
 - RTL-SDR USB capture and audio on physical Cardputer Zero hardware
 - ARM64 `.deb` installation on real hardware
 - CardputerZero Store submission
+
+Mutable settings are stored under `$XDG_CONFIG_HOME/cardputerzero-sdr/` or `~/.config/cardputerzero-sdr/`. The packaged `/etc/cardputerzero-sdr.conf` and repository default remain read-only fallbacks.
 
 ## Controls
 
@@ -54,6 +56,8 @@ Not implemented or verified yet:
 | Backspace | Delete direct-entry character | — |
 
 The bottom bar always shows the primary actions. Z/C frequency tuning and F/X settings-row movement support controlled key repeat; step changes, toggles, confirmation, and direct entry execute once per press. Destructive or hidden key chords are intentionally absent.
+
+On the Settings gain row, Left/Right cycles `AUTO` and the exact gain values reported by the connected tuner. The FC0012 target exposes −9.9, −4.0, 7.1, 17.9, and 19.2 dB; other RTL-SDR tuners use their own reported list. `G` remains a one-press auto/manual shortcut.
 
 ## Desktop build
 

@@ -10,6 +10,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace device {
 
@@ -42,6 +43,7 @@ public:
     RadioSessionState state() const;
     std::string status_detail() const;
     std::string device_name() const;
+    std::vector<int> supported_gains() const;
     bool latest_spectrum(dsp::SpectrumFrame& frame) const;
     bool audio_active() const;
 
@@ -66,6 +68,7 @@ private:
     dsp::SpectrumFrame latest_frame_{};
     std::string status_detail_;
     std::string device_name_;
+    std::vector<int> supported_gains_;
     std::thread worker_;
 };
 

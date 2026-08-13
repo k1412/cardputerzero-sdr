@@ -254,6 +254,14 @@ void BaseViewModel::poll_radio_session() {
 
     const auto session_state = radio_session_.state();
     const bool audio_active = radio_session_.audio_active();
+    const bool entering_live = session_state == device::RadioSessionState::Live &&
+                               published_session_state_ != device::RadioSessionState::Live;
+    if (entering_live) {
+        model_.set_supported_gains(radio_session_.supported_gains());
+        if (!model_.automatic_gain()) {
+            radio_session_.request_gain(false, model_.gain_tenths_db());
+        }
+    }
     switch (session_state) {
         case device::RadioSessionState::Stopped:
         case device::RadioSessionState::Connecting:

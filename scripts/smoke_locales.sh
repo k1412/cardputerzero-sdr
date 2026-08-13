@@ -27,6 +27,7 @@ for locale in "${locales[@]}"; do
                 ZERO_SDR_ALSA_LIBRARY="$output_dir/missing-libasound.so")
     fi
     env SDL_VIDEODRIVER=dummy \
+      XDG_CONFIG_HOME="$output_dir/config/$locale-$page" \
       ZERO_SDR_LOCALE="$locale" \
       "${page_env[@]}" \
       ZERO_SDR_SCREENSHOT="$output_dir/$locale-$page.png" \

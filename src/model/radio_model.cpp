@@ -3,9 +3,27 @@
 #include "radio_model.h"
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstdint>
+#include <iterator>
+#include <utility>
 
 namespace model {
+namespace {
+
+size_t nearest_gain_index(const std::vector<int>& gains, int requested_gain) {
+    const auto nearest = std::min_element(
+        gains.begin(), gains.end(), [requested_gain](int left, int right) {
+            const auto left_distance = std::llabs(
+                static_cast<long long>(left) - static_cast<long long>(requested_gain));
+            const auto right_distance = std::llabs(
+                static_cast<long long>(right) - static_cast<long long>(requested_gain));
+            return left_distance < right_distance;
+        });
+    return static_cast<size_t>(std::distance(gains.begin(), nearest));
+}
+
+} // namespace
 
 uint32_t RadioModel::frequency_hz() const {
     return frequency_hz_;
@@ -69,9 +87,33 @@ int RadioModel::gain_tenths_db() const {
     return gain_tenths_db_;
 }
 
+const std::vector<int>& RadioModel::gain_steps_tenths_db() const {
+    return gain_steps_tenths_db_;
+}
+
+void RadioModel::set_supported_gains(std::vector<int> gains_tenths_db) {
+    gains_tenths_db.erase(
+        std::remove_if(gains_tenths_db.begin(),
+                       gains_tenths_db.end(),
+                       [](int gain) {
+                           return gain < kMinimumGainTenthsDb || gain > kMaximumGainTenthsDb;
+                       }),
+        gains_tenths_db.end());
+    std::sort(gains_tenths_db.begin(), gains_tenths_db.end());
+    gains_tenths_db.erase(
+        std::unique(gains_tenths_db.begin(), gains_tenths_db.end()),
+        gains_tenths_db.end());
+    if (gains_tenths_db.empty()) return;
+
+    gain_steps_tenths_db_ = std::move(gains_tenths_db);
+    gain_tenths_db_ = gain_steps_tenths_db_[
+        nearest_gain_index(gain_steps_tenths_db_, gain_tenths_db_)];
+}
+
 void RadioModel::set_gain(bool automatic_gain, int gain_tenths_db) {
     automatic_gain_ = automatic_gain;
-    gain_tenths_db_ = std::clamp(gain_tenths_db, 0, 490);
+    gain_tenths_db_ = gain_steps_tenths_db_[
+        nearest_gain_index(gain_steps_tenths_db_, gain_tenths_db)];
 }
 
 void RadioModel::toggle_gain_mode() {
@@ -79,8 +121,29 @@ void RadioModel::toggle_gain_mode() {
 }
 
 void RadioModel::adjust_gain(int direction) {
-    automatic_gain_ = false;
-    gain_tenths_db_ = std::clamp(gain_tenths_db_ + (direction < 0 ? -10 : 10), 0, 490);
+    if (direction == 0 || gain_steps_tenths_db_.empty()) return;
+    if (automatic_gain_) {
+        automatic_gain_ = false;
+        gain_tenths_db_ = direction < 0 ? gain_steps_tenths_db_.back()
+                                        : gain_steps_tenths_db_.front();
+        return;
+    }
+
+    const size_t current = nearest_gain_index(gain_steps_tenths_db_, gain_tenths_db_);
+    if (direction < 0) {
+        if (current == 0) {
+            automatic_gain_ = true;
+        }
+        else {
+            gain_tenths_db_ = gain_steps_tenths_db_[current - 1];
+        }
+    }
+    else if (current + 1 >= gain_steps_tenths_db_.size()) {
+        automatic_gain_ = true;
+    }
+    else {
+        gain_tenths_db_ = gain_steps_tenths_db_[current + 1];
+    }
 }
 
 bool RadioModel::dark_mode() const {

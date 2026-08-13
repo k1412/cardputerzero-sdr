@@ -78,6 +78,11 @@ std::string RadioSession::device_name() const {
     return device_name_;
 }
 
+std::vector<int> RadioSession::supported_gains() const {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    return supported_gains_;
+}
+
 bool RadioSession::latest_spectrum(dsp::SpectrumFrame& frame) const {
     std::lock_guard<std::mutex> lock(data_mutex_);
     if (latest_frame_.sequence == 0) return false;
@@ -112,7 +117,14 @@ void RadioSession::worker_main() {
         }
 
         std::string error;
-        if (!radio.open(available_devices.front().index, error) ||
+        if (!radio.open(available_devices.front().index, error)) {
+            radio.close();
+            set_state(RadioSessionState::Error, error, available_devices.front().name);
+            if (wait_for_retry()) break;
+            continue;
+        }
+        const auto tuner_gains = radio.tuner_gains(error);
+        if (tuner_gains.empty() ||
             !radio.configure(requested_frequency_hz_.load(),
                              kSampleRateHz,
                              requested_automatic_gain_.load(),
@@ -122,6 +134,10 @@ void RadioSession::worker_main() {
             set_state(RadioSessionState::Error, error, available_devices.front().name);
             if (wait_for_retry()) break;
             continue;
+        }
+        {
+            std::lock_guard<std::mutex> lock(data_mutex_);
+            supported_gains_ = tuner_gains;
         }
 
         uint64_t applied_generation = settings_generation_.load();

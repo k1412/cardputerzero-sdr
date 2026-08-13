@@ -13,6 +13,7 @@ capture() {
   local name="$1"
   shift
   env SDL_VIDEODRIVER=dummy \
+    XDG_CONFIG_HOME="$output_dir/config/$name" \
     ZERO_SDR_SCREENSHOT="$output_dir/$name.png" \
     ZERO_SDR_SCREENSHOT_EXIT=1 \
     "$@" "$binary" >"$output_dir/$name.log" 2>&1

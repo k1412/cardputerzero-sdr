@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <array>
 #include <climits>
+#include <cstdlib>
 #include <cstring>
 #include <utility>
 
@@ -87,6 +88,7 @@ public:
     using SetSampleRate = int (*)(rtlsdr_dev_t*, uint32_t);
     using SetTunerGainMode = int (*)(rtlsdr_dev_t*, int);
     using SetTunerGain = int (*)(rtlsdr_dev_t*, int);
+    using GetTunerGains = int (*)(rtlsdr_dev_t*, int*);
     using SetAgcMode = int (*)(rtlsdr_dev_t*, int);
     using ResetBuffer = int (*)(rtlsdr_dev_t*);
     using ReadSync = int (*)(rtlsdr_dev_t*, void*, int, int*);
@@ -129,6 +131,7 @@ public:
                     resolve(handle, set_sample_rate, "rtlsdr_set_sample_rate", error) &&
                     resolve(handle, set_tuner_gain_mode, "rtlsdr_set_tuner_gain_mode", error) &&
                     resolve(handle, set_tuner_gain, "rtlsdr_set_tuner_gain", error) &&
+                    resolve(handle, get_tuner_gains, "rtlsdr_get_tuner_gains", error) &&
                     resolve(handle, set_agc_mode, "rtlsdr_set_agc_mode", error) &&
                     resolve(handle, reset_buffer_fn, "rtlsdr_reset_buffer", error) &&
                     resolve(handle, read_sync_fn, "rtlsdr_read_sync", error);
@@ -163,6 +166,7 @@ public:
     SetSampleRate set_sample_rate{nullptr};
     SetTunerGainMode set_tuner_gain_mode{nullptr};
     SetTunerGain set_tuner_gain{nullptr};
+    GetTunerGains get_tuner_gains{nullptr};
     SetAgcMode set_agc_mode{nullptr};
     ResetBuffer reset_buffer_fn{nullptr};
     ReadSync read_sync_fn{nullptr};
@@ -235,6 +239,29 @@ bool RtlSdrDevice::is_open() const {
     return impl_->device != nullptr;
 }
 
+std::vector<int> RtlSdrDevice::tuner_gains(std::string& error) const {
+    if (!is_open()) {
+        error = "RTL-SDR device is not open";
+        return {};
+    }
+    const int count = impl_->get_tuner_gains(impl_->device, nullptr);
+    if (count <= 0 || count > 256) {
+        error = "RTL-SDR returned an invalid tuner gain count";
+        return {};
+    }
+    std::vector<int> gains(static_cast<size_t>(count));
+    const int returned = impl_->get_tuner_gains(impl_->device, gains.data());
+    if (returned <= 0 || returned > count) {
+        error = "RTL-SDR failed to return tuner gain values";
+        return {};
+    }
+    gains.resize(static_cast<size_t>(returned));
+    std::sort(gains.begin(), gains.end());
+    gains.erase(std::unique(gains.begin(), gains.end()), gains.end());
+    error.clear();
+    return gains;
+}
+
 bool RtlSdrDevice::configure(uint32_t center_frequency_hz,
                              uint32_t sample_rate_hz,
                              bool automatic_gain,
@@ -277,9 +304,21 @@ bool RtlSdrDevice::set_gain(bool automatic_gain, int gain_tenths_db, std::string
         error = "failed to set RTL-SDR gain mode";
         return false;
     }
-    if (!automatic_gain && impl_->set_tuner_gain(impl_->device, gain_tenths_db) != 0) {
-        error = "failed to set RTL-SDR tuner gain";
-        return false;
+    if (!automatic_gain) {
+        const auto gains = tuner_gains(error);
+        if (gains.empty()) return false;
+        const auto nearest = std::min_element(
+            gains.begin(), gains.end(), [gain_tenths_db](int left, int right) {
+                const auto left_distance = std::llabs(
+                    static_cast<long long>(left) - static_cast<long long>(gain_tenths_db));
+                const auto right_distance = std::llabs(
+                    static_cast<long long>(right) - static_cast<long long>(gain_tenths_db));
+                return left_distance < right_distance;
+            });
+        if (impl_->set_tuner_gain(impl_->device, *nearest) != 0) {
+            error = "failed to set RTL-SDR tuner gain";
+            return false;
+        }
     }
     error.clear();
     return true;

@@ -3,8 +3,11 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 
 extern "C" {
+
+constexpr int kFakeGains[] = {-99, -40, 71, 179, 192};
 
 struct rtlsdr_dev {
     uint32_t center_frequency{0};
@@ -59,9 +62,19 @@ int rtlsdr_set_tuner_gain_mode(rtlsdr_dev* device, int value) {
 }
 
 int rtlsdr_set_tuner_gain(rtlsdr_dev* device, int value) {
-    if (!device) return -1;
+    if (!device || std::find(std::begin(kFakeGains), std::end(kFakeGains), value) ==
+                       std::end(kFakeGains)) {
+        return -1;
+    }
     device->gain = value;
     return 0;
+}
+
+int rtlsdr_get_tuner_gains(rtlsdr_dev* device, int* gains) {
+    if (!device) return -1;
+    constexpr int count = static_cast<int>(std::size(kFakeGains));
+    if (gains) std::copy(std::begin(kFakeGains), std::end(kFakeGains), gains);
+    return count;
 }
 
 int rtlsdr_set_agc_mode(rtlsdr_dev* device, int) {

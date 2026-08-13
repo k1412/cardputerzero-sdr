@@ -36,6 +36,7 @@ int main(int argc, char** argv) {
     assert(wait_for_live_frame(session, frame, true));
     assert(session.state() == device::RadioSessionState::Live);
     assert(session.device_name() == "Fake RTL2832U");
+    assert((session.supported_gains() == std::vector<int>{-99, -40, 71, 179, 192}));
     assert(frame.sequence > 0);
     assert(session.audio_active());
     session.request_frequency(103'900'000);

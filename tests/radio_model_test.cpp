@@ -49,10 +49,20 @@ int main() {
     assert(radio.automatic_gain());
     radio.adjust_gain(1);
     assert(!radio.automatic_gain());
-    assert(radio.gain_tenths_db() == 210);
+    assert(radio.gain_tenths_db() == -99);
+    radio.adjust_gain(-1);
+    assert(radio.automatic_gain());
+    radio.adjust_gain(-1);
+    assert(!radio.automatic_gain());
+    assert(radio.gain_tenths_db() == 192);
+    radio.set_supported_gains({200, 0, 90, 90});
+    assert((radio.gain_steps_tenths_db() == std::vector<int>{0, 90, 200}));
+    assert(radio.gain_tenths_db() == 200);
+    radio.set_gain(false, 80);
+    assert(radio.gain_tenths_db() == 90);
     radio.set_gain(true, 999);
     assert(radio.automatic_gain());
-    assert(radio.gain_tenths_db() == 490);
+    assert(radio.gain_tenths_db() == 200);
     radio.set_muted(true);
     assert(radio.muted());
 

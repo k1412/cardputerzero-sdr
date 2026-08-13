@@ -86,9 +86,6 @@ bool same_config(const ApplicationConfig& left, const ApplicationConfig& right) 
 }
 
 std::string writable_config_path() {
-#if USE_DESKTOP
-    return APP_CONFIG_FILE;
-#else
     if (const char* xdg_config_home = std::getenv("XDG_CONFIG_HOME")) {
         const std::filesystem::path root(xdg_config_home);
         if (!root.empty() && root.is_absolute()) {
@@ -102,7 +99,6 @@ std::string writable_config_path() {
         }
     }
     return APP_CONFIG_FILE;
-#endif
 }
 
 void persist_settings_observer(lv_observer_t* observer, lv_subject_t* subject) {

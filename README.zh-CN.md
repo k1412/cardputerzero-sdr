@@ -21,7 +21,7 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 - 使用数字行直接输入 MHz，支持小数点、退格、Enter 和 Esc
 - 与实测 FC0012 调谐器一致的 22.0–948.6 MHz 频率边界
 - 从 10 kHz 到 1 MHz 的六档调谐步进
-- 自动/手动增益、静音、深色/浅色主题
+- 自动增益与设备上报的手动增益档位、静音、深色/浅色主题
 - 自动保存上次使用的频率、步进、增益、静音、主题和语言
 - 运行时加载 RTL-SDR、带信道滤波的 WFM 音频与自动重连
 - 经审计的 ARM64 Debian 安装包，内含固定版本的私有 librtlsdr 运行库
@@ -35,6 +35,8 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 - 在实体 Cardputer Zero 上进行 RTL-SDR USB 采集和音频验证
 - 在实体设备上安装 ARM64 `.deb`
 - 提交 CardputerZero 应用商店
+
+可变设置保存在 `$XDG_CONFIG_HOME/cardputerzero-sdr/` 或 `~/.config/cardputerzero-sdr/`；安装包中的 `/etc/cardputerzero-sdr.conf` 和仓库默认文件只作为只读初始值。
 
 ## 按键
 
@@ -54,6 +56,8 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 | 退格 | 删除直接输入的字符 | — |
 
 底栏始终显示主要操作提示。Z/C 连续调谐和设置页 F/X 移动支持受控长按；步进、切换、确认和直接输入每次按下只执行一次。项目刻意避免破坏性操作和隐藏组合键。
+
+在设置页的增益行中，左/右键会循环 `自动` 和当前调谐器实际报告的增益档位。目标 FC0012 提供 −9.9、−4.0、7.1、17.9 和 19.2 dB；其他 RTL-SDR 调谐器使用各自上报的列表。`G` 仍是一键切换自动/手动增益的快捷键。
 
 ## 桌面构建
 
