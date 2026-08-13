@@ -11,7 +11,7 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 ![无线电频谱与瀑布图](screenshots/radio-dark.png)
 
 > [!IMPORTANT]
-> 本仓库仍处于发布前的硬件适配阶段。界面、可复现的离线演示、十语言目录和桌面测试均可工作；实时 RTL-SDR 采集、WFM 音频、USB 供电表现和性能尚未在实体 Cardputer Zero 上验证，因此目前不宣称已经在应用商店发布。
+> 本仓库仍处于发布前的硬件适配阶段。界面、可复现的离线演示、十语言目录和桌面测试均可工作；实时 RTL-SDR 采集、WFM 音频、USB 供电表现和性能尚未在实体 Cardputer Zero 上验证。因此，[商店 PR #116](https://github.com/CardputerZero/packages/pull/116) 只是用于独立 CI 校验的草稿，并不代表应用已经发布。
 
 ## 当前状态
 
@@ -36,7 +36,7 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 
 - 在实体 Cardputer Zero 上进行 RTL-SDR USB 采集和音频验证
 - 在实体设备上安装 ARM64 `.deb`
-- 提交 CardputerZero 应用商店
+- 完成真机 P0 证据，并将 CardputerZero 商店草稿转入正式审核与合并
 
 可变设置保存在 `$XDG_CONFIG_HOME/cardputerzero-sdr/` 或 `~/.config/cardputerzero-sdr/`；安装包中的 `/etc/cardputerzero-sdr.conf` 和仓库默认文件只作为只读初始值。
 
@@ -153,7 +153,7 @@ docs/          架构、交互、语言和设备验证指南
 
 ## 应用商店发布策略
 
-`app-builder.json` 已按 CardputerZero 工具准备，引用的截图均为原生 320×170 PNG。P0 实机检查通过前不会发布。应用不安装 root 系统服务、应用自有的系统 udev 规则或任何维护者脚本，也不需要网络或云端服务。安装包依赖 Debian 的 `librtlsdr0`，由该系统包维护的规则将受支持的 RTL-SDR 设备授权给 `plugdev`，当前设备商店会通过 Debian 包管理器解析这项依赖。正常 APPLaunch 用户的实机访问权限仍是 P0 发布门禁。设备打包 CI 还会下载官方商店仓库中固定提交的安装路径策略，在校验脚本摘要后对每个 `.deb` 执行同一套检查。
+`app-builder.json` 已按 CardputerZero 工具准备，引用的截图均为原生 320×170 PNG。[商店草稿 PR #116](https://github.com/CardputerZero/packages/pull/116) 会运行官方仓库的校验，但尚未请求发布；P0 实机检查通过并附上证据前必须保持草稿状态。应用不安装 root 系统服务、应用自有的系统 udev 规则或任何维护者脚本，也不需要网络或云端服务。安装包依赖 Debian 的 `librtlsdr0`，由该系统包维护的规则将受支持的 RTL-SDR 设备授权给 `plugdev`，当前设备商店会通过 Debian 包管理器解析这项依赖。正常 APPLaunch 用户的实机访问权限仍是 P0 发布门禁。设备打包 CI 还会下载官方商店仓库中固定提交的安装路径策略，在校验脚本摘要后对每个 `.deb` 执行同一套检查。
 
 安装包名为 `cardputerzero-sdr`，在应用商店和 APPLaunch 中显示为 `Zero SDR Keyboard`（中文商店标题为“Zero SDR 键盘版”）。商店中已有的 `zerosdr` 是另一个项目；使用不同的展示名可避免混淆，本仓库不声明与其兼容或拥有该名称。
 

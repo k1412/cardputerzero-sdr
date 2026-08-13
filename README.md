@@ -11,7 +11,7 @@ Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. 
 ![Radio spectrum and waterfall](screenshots/radio-dark.png)
 
 > [!IMPORTANT]
-> This repository is a pre-release hardware bring-up project. The UI, deterministic offline demo, ten-language catalog, and desktop tests work. Live RTL-SDR capture, WFM audio, USB power behavior, and performance have **not** yet been verified on a physical Cardputer Zero, so no App Store release is claimed yet.
+> This repository is a pre-release hardware bring-up project. The UI, deterministic offline demo, ten-language catalog, and desktop tests work. Live RTL-SDR capture, WFM audio, USB power behavior, and performance have **not** yet been verified on a physical Cardputer Zero. [Store PR #116](https://github.com/CardputerZero/packages/pull/116) is therefore a draft used for independent CI validation, not a published App Store release.
 
 ## Current status
 
@@ -36,7 +36,7 @@ Not implemented or verified yet:
 
 - RTL-SDR USB capture and audio on physical Cardputer Zero hardware
 - ARM64 `.deb` installation on real hardware
-- CardputerZero Store submission
+- Physical P0 evidence and promotion of the draft CardputerZero Store submission to review/merge
 
 Mutable settings are stored under `$XDG_CONFIG_HOME/cardputerzero-sdr/` or `~/.config/cardputerzero-sdr/`. The packaged `/etc/cardputerzero-sdr.conf` and repository default remain read-only fallbacks.
 
@@ -153,7 +153,7 @@ See [Architecture](docs/ARCHITECTURE.md), [UX and controls](docs/UX.md), [Intern
 
 ## Store release policy
 
-`app-builder.json` is prepared for the CardputerZero tooling, and all referenced screenshots are native 320×170 PNGs. Publication is held until the P0 hardware checks pass. The app does not install a root system service, an application-owned system udev rule, or any maintainer script, and it does not require network or cloud access. The package depends on Debian's `librtlsdr0`, whose distribution-owned rule grants the supported RTL-SDR devices to `plugdev`; the current device Store resolves this dependency through Debian's package manager. Access by the normal APPLaunch user remains a physical P0 gate. Device-package CI also runs the pinned, digest-verified install-path policy from the authoritative Store repository against every `.deb`.
+`app-builder.json` is prepared for the CardputerZero tooling, and all referenced screenshots are native 320×170 PNGs. [Draft Store PR #116](https://github.com/CardputerZero/packages/pull/116) exercises the official repository's validation without requesting publication; it must remain a draft until the P0 hardware checks pass and their evidence is attached. The app does not install a root system service, an application-owned system udev rule, or any maintainer script, and it does not require network or cloud access. The package depends on Debian's `librtlsdr0`, whose distribution-owned rule grants the supported RTL-SDR devices to `plugdev`; the current device Store resolves this dependency through Debian's package manager. Access by the normal APPLaunch user remains a physical P0 gate. Device-package CI also runs the pinned, digest-verified install-path policy from the authoritative Store repository against every `.deb`.
 
 The package name is `cardputerzero-sdr`, and its Store/APPLaunch title is `Zero SDR Keyboard`. An existing Store app named `zerosdr` is a separate project; the distinct listing title prevents ambiguity, and this repository does not claim compatibility or ownership of it.
 
