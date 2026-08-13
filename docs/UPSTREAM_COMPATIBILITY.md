@@ -50,6 +50,11 @@ an explicitly matching `CM0_SDK_SHA256` value.
   audited `CardputerZero/packages` revision, verifies the policy script digest,
   and applies it to the built `.deb`. It also mirrors the server's setuid,
   device-node, and maintainer-script safety checks.
+- The current registry generator preserves `permissions` only when it is an
+  object, although the AppBuilder schema document still describes a string
+  array. Zero SDR uses the registry-consumed object form and CI checks the full
+  offline keyboard/audio/external-hardware declaration so its Store entry does
+  not silently lose permission metadata.
 
 ## Release audit procedure
 

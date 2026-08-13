@@ -34,6 +34,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 - P0 package, `plugdev`, distro-udev, and USB high-speed gates with privacy-preserving evidence
 - Localized USB-access recovery and device-busy guidance instead of a generic hardware error
 - Stable compiler source paths and no transient CI/workspace path in the device binary
+- Store metadata aligned with the registry-consumed permission object plus localized detail text for all ten app languages
 
 ### Known limitations
 

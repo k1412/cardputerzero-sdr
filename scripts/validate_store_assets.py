@@ -10,6 +10,32 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+EXPECTED_LOCALES = {
+    "en",
+    "zh-CN",
+    "zh-TW",
+    "es",
+    "ja",
+    "ko",
+    "fr",
+    "de",
+    "pt-BR",
+    "ru",
+}
+EXPECTED_PERMISSIONS = {
+    "microphone": False,
+    "audio_output": True,
+    "network": False,
+    "filesystem": "app-data-only",
+    "keyboard_input": True,
+    "background_service": False,
+    "external_hardware": True,
+    "hdmi_output": False,
+    "camera": False,
+    "sensors": False,
+    "gps": False,
+    "device_id": False,
+}
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -32,6 +58,12 @@ def require_relative_file(value: object, field: str) -> Path:
     return resolved
 
 
+def require_text(value: object, field: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{field} must be a non-empty string")
+    return value
+
+
 def main() -> int:
     manifest_path = ROOT / "app-builder.json"
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -44,6 +76,13 @@ def main() -> int:
     store = data.get("store")
     if not isinstance(store, dict):
         raise ValueError("missing store object")
+    require_text(store.get("summary"), "store.summary")
+    require_text(store.get("description"), "store.description")
+    categories = store.get("categories")
+    if not isinstance(categories, list) or not categories or not all(
+        isinstance(item, str) and item for item in categories
+    ):
+        raise ValueError("store.categories must be a non-empty string array")
     screenshots = store.get("screenshots")
     if not isinstance(screenshots, list) or not screenshots:
         raise ValueError("store.screenshots must contain at least one path")
@@ -57,11 +96,26 @@ def main() -> int:
     if width != height or width < 100:
         raise ValueError("store.icon must be square and at least 100x100")
 
-    permissions = store.get("permissions", [])
-    if not isinstance(permissions, list) or not all(isinstance(item, str) for item in permissions):
-        raise ValueError("store.permissions must be a string array")
+    permissions = store.get("permissions")
+    if permissions != EXPECTED_PERMISSIONS:
+        raise ValueError(
+            "store.permissions must be the complete registry permission object "
+            "for this offline keyboard/audio/RTL-SDR app"
+        )
 
-    print(f"validated {len(screenshots)} screenshots, {width}x{height} icon, and store manifest")
+    locales = store.get("locales")
+    if not isinstance(locales, dict) or set(locales) != EXPECTED_LOCALES:
+        raise ValueError("store.locales must cover the same ten locales as the app")
+    for locale, localized in locales.items():
+        if not isinstance(localized, dict):
+            raise ValueError(f"store.locales.{locale} must be an object")
+        for field in ("title", "summary", "description"):
+            require_text(localized.get(field), f"store.locales.{locale}.{field}")
+
+    print(
+        f"validated {len(screenshots)} screenshots, {width}x{height} icon, "
+        f"{len(locales)} locales, and explicit registry permissions"
+    )
     return 0
 
 
