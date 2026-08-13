@@ -63,6 +63,8 @@ jobs:
           grep -q '/etc/cardputerzero-sdr.conf$' /tmp/package-contents.txt
           grep -q '/lib/udev/rules.d/60-cardputerzero-sdr-rtlsdr.rules$' /tmp/package-contents.txt
           grep -q '/usr/lib/cardputerzero-sdr/librtlsdr.so.2.0.3$' /tmp/package-contents.txt
+          grep -q '/usr/share/doc/cardputerzero-sdr/README.md$' /tmp/package-contents.txt
+          grep -q '/usr/share/doc/cardputerzero-sdr/README.zh-CN.md$' /tmp/package-contents.txt
           grep -q '/usr/share/doc/cardputerzero-sdr/librtlsdr-GPL-2.0-or-later.txt$' /tmp/package-contents.txt
           control_dir=$(mktemp -d)
           dpkg-deb -e "$package" "$control_dir"
