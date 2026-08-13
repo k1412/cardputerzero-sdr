@@ -58,6 +58,8 @@ void read_battery(DeviceStatus& status) {
         return;
     }
 
+    std::filesystem::path fallback_battery;
+    std::filesystem::path preferred_battery;
     for (const auto& entry : std::filesystem::directory_iterator(root, ec)) {
         if (ec) {
             return;
@@ -66,14 +68,38 @@ void read_battery(DeviceStatus& status) {
         if (!read_text_file(entry.path() / "type", type) || type != "Battery") {
             continue;
         }
+        const auto name = entry.path().filename().string();
+        if (name.find("bq27220") != std::string::npos ||
+            name.find("bq27") != std::string::npos) {
+            preferred_battery = entry.path();
+            break;
+        }
+        if (fallback_battery.empty()) {
+            fallback_battery = entry.path();
+        }
+    }
 
-        status.battery_percent = read_int_file(entry.path() / "capacity");
-        status.battery_present = status.battery_percent >= 0;
-        std::string battery_state;
-        status.battery_charging = read_text_file(entry.path() / "status", battery_state) &&
-                                  battery_state == "Charging";
+    const auto& battery = preferred_battery.empty() ? fallback_battery : preferred_battery;
+    if (battery.empty()) {
         return;
     }
+
+    const auto present_path = battery / "present";
+    ec.clear();
+    if (std::filesystem::exists(present_path, ec) && read_int_file(present_path, 0) != 1) {
+        return;
+    }
+
+    const int32_t capacity = read_int_file(battery / "capacity");
+    if (capacity < 0 || capacity > 100) {
+        return;
+    }
+
+    status.battery_percent = capacity;
+    status.battery_present = true;
+    std::string battery_state;
+    status.battery_charging = read_text_file(battery / "status", battery_state) &&
+                              battery_state == "Charging";
 }
 
 void read_wifi_strength(DeviceStatus& status, const std::string& interface_name) {

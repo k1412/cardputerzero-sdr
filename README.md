@@ -129,7 +129,7 @@ The cross preset follows the official CardputerZero CMake template and downloads
 cmake --workflow --preset cp0-cross-package
 ```
 
-Expected package name: `dist/cardputerzero-sdr_0.1.0-6_arm64.deb`.
+Expected package name: `dist/cardputerzero-sdr_0.1.0-7_arm64.deb`.
 
 Do not treat a successful cross-build as device validation. Complete [the hardware test plan](docs/DEVICE_TEST_PLAN.md) before publishing a release.
 

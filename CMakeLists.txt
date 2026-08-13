@@ -783,6 +783,20 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     target_include_directories(display_device_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/platform")
     add_test(NAME display_device COMMAND display_device_test)
 
+    set(DEVICE_STATUS_TEST_ROOT "${CMAKE_CURRENT_BINARY_DIR}/device-status-test")
+    add_executable(device_status_test
+        tests/device_status_test.cpp
+        src/platform/device_status.cpp
+    )
+    target_include_directories(device_status_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/platform")
+    target_compile_definitions(device_status_test PRIVATE
+        USE_DESKTOP=0
+        APP_POWER_SUPPLY_ROOT="${DEVICE_STATUS_TEST_ROOT}/power"
+        APP_NETWORK_CLASS_ROOT="${DEVICE_STATUS_TEST_ROOT}/network"
+        APP_WIRELESS_STATUS_PATH="${DEVICE_STATUS_TEST_ROOT}/wireless"
+    )
+    add_test(NAME device_status COMMAND device_status_test "${DEVICE_STATUS_TEST_ROOT}")
+
     add_executable(synthetic_spectrum_test tests/synthetic_spectrum_test.cpp)
     target_link_libraries(synthetic_spectrum_test PRIVATE ${PROJECT_NAME}_model)
     add_test(NAME synthetic_spectrum COMMAND synthetic_spectrum_test)

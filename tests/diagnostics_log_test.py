@@ -55,7 +55,7 @@ monitor_tools=ok
 launcher_service=active
 device_model=M5Stack Cardputer Zero path=/sys/firmware/devicetree/base/model
 cardputerzero_overlay=cardputerzero-v5-overlay path=/boot/firmware/config.txt
-package=install ok installed 0.1.0-6 arm64
+package=install ok installed 0.1.0-7 arm64
 rtl_runtime_package=install ok installed 2.0.2-2+b1 arm64
 rtl_udev_rule=valid path=/usr/lib/udev/rules.d/60-librtlsdr0.rules
 app_path=/usr/bin/cardputerzero-sdr

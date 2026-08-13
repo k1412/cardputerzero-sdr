@@ -62,6 +62,7 @@ The application converts `SIGINT` and `SIGTERM` into a main-loop stop request, t
 - The desktop LVGL software renderer is intentionally single-worker because concurrent FreeType access was unstable with CJK font rasterization.
 - Device builds must be profiled before increasing FFT size or frame rate.
 - Device input prefers APPLaunch's `LV_LINUX_KEYBOARD_DEVICE`/`APPLAUNCH_LINUX_KEYBOARD_DEVICE`, then the official stable TCA8418 by-path node, and only then scans for one evdev device that exposes every Zero SDR control group. This avoids binding unrelated or duplicate event nodes. Because the Cardputer TCA8418 device tree does not enable kernel `EV_REP`, the adapter synthesizes the same 500 ms delay/50 ms repeat cadence as APPLaunch; screen-level policy still accepts repeats only for continuous tuning and settings-row movement.
+- The title bar reads standard Linux power-supply and network sysfs rather than linking to Launcher internals. Battery selection mirrors the official Launcher by preferring a `bq27220`/`bq27` battery-class device, honoring its physical `present` flag, and accepting only a 0–100% capacity; a generic battery is used only when the board gauge is not enumerated. This prevents an attached USB UPS from replacing Cardputer Zero's own battery status.
 
 ## Dependency policy
 

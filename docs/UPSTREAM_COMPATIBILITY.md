@@ -35,6 +35,11 @@ an explicitly matching `CM0_SDK_SHA256` value.
 - The current TCA8418 overlay does not enable `keypad,autorepeat`. Zero SDR
   therefore synthesizes the Launcher's 500 ms initial delay and 50 ms repeat
   cadence, but defers to kernel `EV_REP` if a future overlay enables it.
+- The Launcher discovers a battery-class power supply and prioritizes names
+  containing `bq27220`/`bq27`, matching the board gauge shipped by the official
+  overlays. Zero SDR follows that selection rule for its title bar, requires a
+  present battery and valid 0–100% capacity, and regression-tests the choice
+  against a competing USB battery plus Wi-Fi/Ethernet sysfs fixtures.
 - APPLaunch gives an external application exclusive framebuffer ownership and
   resumes after it exits. Zero SDR handles Esc normally and handles `SIGINT` and
   `SIGTERM` through the same clean receiver/audio shutdown path.

@@ -129,7 +129,7 @@ python3 scripts/summarize_diagnostics.py --p0 path/to/evidence
 cmake --workflow --preset cp0-cross-package
 ```
 
-预期安装包：`dist/cardputerzero-sdr_0.1.0-6_arm64.deb`。
+预期安装包：`dist/cardputerzero-sdr_0.1.0-7_arm64.deb`。
 
 交叉编译成功不等同于实机验证。发布前必须完成[硬件测试计划](docs/DEVICE_TEST_PLAN.md)中的检查。
 
