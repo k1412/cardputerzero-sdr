@@ -6,6 +6,8 @@ build_dir="$(cd -- "$(dirname -- "$binary")" && pwd)"
 output_dir="${2:-/tmp/zero-sdr-locale-smoke}"
 locales=(en zh-CN zh-TW es ja ko fr de pt-BR ru)
 fake_rtlsdr="$build_dir/fake_rtlsdr.so"
+config_root="$(mktemp -d)"
+trap 'rm -rf -- "$config_root"' EXIT
 
 mkdir -p "$output_dir"
 
@@ -27,7 +29,7 @@ for locale in "${locales[@]}"; do
                 ZERO_SDR_ALSA_LIBRARY="$output_dir/missing-libasound.so")
     fi
     env SDL_VIDEODRIVER=dummy \
-      XDG_CONFIG_HOME="$output_dir/config/$locale-$page" \
+      XDG_CONFIG_HOME="$config_root/$locale-$page" \
       ZERO_SDR_LOCALE="$locale" \
       "${page_env[@]}" \
       ZERO_SDR_SCREENSHOT="$output_dir/$locale-$page.png" \
