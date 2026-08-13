@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import re
 import struct
 import sys
 from pathlib import Path
@@ -36,6 +37,7 @@ EXPECTED_PERMISSIONS = {
     "gps": False,
     "device_id": False,
 }
+EXPECTED_SHARE_CODE = "zsdr"
 
 
 def png_size(path: Path) -> tuple[int, int]:
@@ -78,6 +80,13 @@ def main() -> int:
     store = data.get("store")
     if not isinstance(store, dict):
         raise ValueError("missing store object")
+    share_code = store.get("share_code")
+    if not isinstance(share_code, str) or not re.fullmatch(r"[a-z0-9]{4,8}", share_code):
+        raise ValueError("store.share_code must contain 4-8 lowercase ASCII letters or digits")
+    if share_code != EXPECTED_SHARE_CODE:
+        raise ValueError(
+            f"store.share_code must remain the reserved project code: {EXPECTED_SHARE_CODE}"
+        )
     require_text(store.get("summary"), "store.summary")
     require_text(store.get("description"), "store.description")
     categories = store.get("categories")
@@ -118,7 +127,7 @@ def main() -> int:
 
     print(
         f"validated {len(screenshots)} screenshots, {width}x{height} icon, "
-        f"{len(locales)} locales, and explicit registry permissions"
+        f"{len(locales)} locales, share code {share_code}, and explicit registry permissions"
     )
     return 0
 

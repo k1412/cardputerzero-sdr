@@ -155,7 +155,7 @@ docs/          架构、交互、语言和设备验证指南
 
 `app-builder.json` 已按 CardputerZero 工具准备，引用的截图均为原生 320×170 PNG。[商店草稿 PR #116](https://github.com/CardputerZero/packages/pull/116) 会运行官方仓库的校验，但尚未请求发布；P0 实机检查通过并附上证据前必须保持草稿状态。应用不安装 root 系统服务、应用自有的系统 udev 规则或任何维护者脚本，也不需要网络或云端服务。安装包依赖 Debian 的 `librtlsdr0`，由该系统包维护的规则将受支持的 RTL-SDR 设备授权给 `plugdev`，当前设备商店会通过 Debian 包管理器解析这项依赖。正常 APPLaunch 用户的实机访问权限仍是 P0 发布门禁。设备打包 CI 还会下载官方商店仓库中固定提交的安装路径策略，在校验脚本摘要后对每个 `.deb` 执行同一套检查。
 
-安装包名为 `cardputerzero-sdr`，在应用商店和 APPLaunch 中显示为 `Zero SDR Keyboard`（中文商店标题为“Zero SDR 键盘版”）。商店中已有的 `zerosdr` 是另一个项目；使用不同的展示名可避免混淆，本仓库不声明与其兼容或拥有该名称。
+安装包名为 `cardputerzero-sdr`，在应用商店和 APPLaunch 中显示为 `Zero SDR Keyboard`（中文商店标题为“Zero SDR 键盘版”），固定分享码为 `ZSDR`。显式分享码避开了注册表生成器按包名前四位回退所造成的多个 `cardputerzero-*` 条目冲突。商店中已有的 `zerosdr` 是另一个项目；使用不同的展示名可避免混淆，本仓库不声明与其兼容或拥有该名称。
 
 ## 许可证
 

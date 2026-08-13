@@ -155,7 +155,7 @@ See [Architecture](docs/ARCHITECTURE.md), [UX and controls](docs/UX.md), [Intern
 
 `app-builder.json` is prepared for the CardputerZero tooling, and all referenced screenshots are native 320×170 PNGs. [Draft Store PR #116](https://github.com/CardputerZero/packages/pull/116) exercises the official repository's validation without requesting publication; it must remain a draft until the P0 hardware checks pass and their evidence is attached. The app does not install a root system service, an application-owned system udev rule, or any maintainer script, and it does not require network or cloud access. The package depends on Debian's `librtlsdr0`, whose distribution-owned rule grants the supported RTL-SDR devices to `plugdev`; the current device Store resolves this dependency through Debian's package manager. Access by the normal APPLaunch user remains a physical P0 gate. Device-package CI also runs the pinned, digest-verified install-path policy from the authoritative Store repository against every `.deb`.
 
-The package name is `cardputerzero-sdr`, and its Store/APPLaunch title is `Zero SDR Keyboard`. An existing Store app named `zerosdr` is a separate project; the distinct listing title prevents ambiguity, and this repository does not claim compatibility or ownership of it.
+The package name is `cardputerzero-sdr`, its Store/APPLaunch title is `Zero SDR Keyboard`, and its explicit Store share code is `ZSDR`. The code avoids the registry generator's package-prefix fallback, which is already ambiguous for several `cardputerzero-*` listings. An existing Store app named `zerosdr` is a separate project; the distinct listing title prevents ambiguity, and this repository does not claim compatibility or ownership of it.
 
 ## License
 
