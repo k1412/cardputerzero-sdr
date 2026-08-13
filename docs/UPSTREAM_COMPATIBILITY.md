@@ -38,6 +38,10 @@ an explicitly matching `CM0_SDK_SHA256` value.
 - APPLaunch gives an external application exclusive framebuffer ownership and
   resumes after it exits. Zero SDR handles Esc normally and handles `SIGINT` and
   `SIGTERM` through the same clean receiver/audio shutdown path.
+- The P0 runner cannot use APPLaunch's in-process `ExecBlocking` handoff from an
+  SSH shell. For a full evidence run it therefore pauses and restores the
+  official `APPLaunch.service` user unit around the child process, and refuses
+  a concurrent Zero SDR instance. Read-only preflight never changes the unit.
 - The package runs as the normal APPLaunch user and installs no root service,
   application-owned system udev rule, or maintainer script. The official BSP's
   glibc identifies its target as Debian 13, where the ARM64 `librtlsdr0` package

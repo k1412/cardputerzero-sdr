@@ -27,6 +27,7 @@ Options:
 
 The report intentionally excludes hostname, network state, and USB serials.
 Run as the same non-root user that launches APPLaunch applications.
+The full evidence run pauses an active APPLaunch user service and restores it.
 EOF
 }
 
@@ -144,7 +145,7 @@ package_state() {
 
 app_path=$(command -v "$app_command" 2>/dev/null || true)
 monitor_tools=ok
-for required_tool in awk grep ps sed stat tr; do
+for required_tool in awk grep ps readlink sed stat systemctl tr; do
     if ! command -v "$required_tool" >/dev/null 2>&1; then
         monitor_tools="missing-$required_tool"
         preflight_ok=0
@@ -153,7 +154,7 @@ for required_tool in awk grep ps sed stat tr; do
 done
 
 {
-    echo "schema=zero-sdr-p0-v2"
+    echo "schema=zero-sdr-p0-v3"
     echo "created_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "kernel=$(uname -srmo 2>/dev/null || echo unavailable)"
     echo "os_id=$(os_value ID)"
@@ -166,6 +167,15 @@ done
         *) echo "plugdev_membership=missing"; preflight_ok=0 ;;
     esac
     echo "monitor_tools=$monitor_tools"
+    launcher_service=unavailable
+    if command -v systemctl >/dev/null 2>&1; then
+        launcher_state=$(systemctl --user is-active APPLaunch.service 2>/dev/null || true)
+        case "$launcher_state" in
+            active|inactive) launcher_service=$launcher_state ;;
+            *) preflight_ok=0 ;;
+        esac
+    fi
+    echo "launcher_service=$launcher_service"
     package=$(package_state cardputerzero-sdr)
     echo "package=$package"
     case "$package" in
@@ -202,6 +212,17 @@ done
         echo "app_path=missing"
         preflight_ok=0
     fi
+    app_processes=0
+    if [ -n "$app_path" ]; then
+        for process_path in "$proc_root"/[0-9]*; do
+            [ -d "$process_path" ] || continue
+            process_exe=$(readlink "$process_path/exe" 2>/dev/null || true)
+            [ "$process_exe" = "$app_path" ] || continue
+            app_processes=$((app_processes + 1))
+        done
+    fi
+    echo "app_processes=$app_processes"
+    [ "$app_processes" -eq 0 ] || preflight_ok=0
 
     framebuffer=${LV_LINUX_FBDEV_DEVICE:-${APPLAUNCH_LINUX_FBDEV_DEVICE:-$dev_root/fb0}}
     framebuffer_name=${framebuffer##*/}
@@ -324,6 +345,37 @@ app_log="$output/app.log"
 result="$output/result.txt"
 echo "epoch,pid,state,elapsed_s,cpu_percent,rss_kib,vsz_kib,mem_available_kib,max_temp_millic" >"$resources"
 
+launcher_was_active=0
+launcher_stop_status=not-needed
+launcher_restart_status=not-needed
+launcher_restore_needed=0
+
+restore_launcher() {
+    if [ "$launcher_restore_needed" -eq 1 ]; then
+        if systemctl --user start APPLaunch.service >/dev/null 2>&1; then
+            launcher_restart_status=0
+        else
+            launcher_restart_status=1
+        fi
+        launcher_restore_needed=0
+    fi
+    return 0
+}
+
+trap restore_launcher 0
+if [ "$launcher_service" = active ]; then
+    launcher_was_active=1
+    launcher_restore_needed=1
+    if systemctl --user stop APPLaunch.service >/dev/null 2>&1 &&
+       ! systemctl --user is-active --quiet APPLaunch.service 2>/dev/null; then
+        launcher_stop_status=0
+    else
+        launcher_stop_status=1
+        echo "failed to pause APPLaunch.service; app was not started" >&2
+        exit 1
+    fi
+fi
+
 ZERO_SDR_DIAGNOSTICS_INTERVAL_MS=30000 "$app_path" >"$app_log" 2>&1 &
 app_pid=$!
 started_epoch=$(date +%s)
@@ -389,6 +441,8 @@ fi
 app_status=0
 wait "$app_pid" || app_status=$?
 ended_epoch=$(date +%s)
+restore_launcher
+trap - 0
 
 {
     echo "schema=zero-sdr-p0-result-v1"
@@ -399,6 +453,9 @@ ended_epoch=$(date +%s)
     echo "duration_complete=$completed"
     echo "app_exit_status=$app_status"
     echo "forced_kill=$forced_kill"
+    echo "launcher_was_active=$launcher_was_active"
+    echo "launcher_stop_status=$launcher_stop_status"
+    echo "launcher_restart_status=$launcher_restart_status"
     echo "diagnostics_records=$(grep -c 'diagnostics ' "$app_log" 2>/dev/null || true)"
 } >"$result"
 
@@ -406,7 +463,8 @@ echo "evidence directory: $output"
 echo "copy it to the development checkout and run:"
 echo "python3 scripts/summarize_diagnostics.py --p0 $output/app.log"
 
-if [ "$completed" -ne 1 ] || [ "$app_status" -ne 0 ]; then
+if [ "$completed" -ne 1 ] || [ "$app_status" -ne 0 ] ||
+   [ "$launcher_restart_status" = 1 ]; then
     exit 1
 fi
 exit 0

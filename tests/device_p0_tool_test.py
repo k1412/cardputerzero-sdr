@@ -30,6 +30,8 @@ def main() -> int:
         proc_root = root / "proc"
         output = root / "evidence"
         fake_bin = root / "bin"
+        launcher_state = root / "launcher-state"
+        launcher_log = root / "launcher-log"
 
         write_executable(
             fake_bin / "id",
@@ -49,7 +51,7 @@ package=""
 for package do :; done
 case "$package" in
     cardputerzero-sdr)
-        printf 'install ok installed 0.1.0-3 arm64'
+        printf 'install ok installed 0.1.0-4 arm64'
         ;;
     librtlsdr0)
         [ "${FAKE_RTL_PACKAGE_MISSING:-0}" = 0 ] || exit 1
@@ -59,6 +61,50 @@ case "$package" in
 esac
 """,
         )
+        write_executable(
+            fake_bin / "systemctl",
+            """#!/bin/sh
+[ "${1:-}" = --user ] || exit 2
+shift
+case "${1:-}" in
+    is-active)
+        shift
+        quiet=0
+        if [ "${1:-}" = --quiet ]; then
+            quiet=1
+            shift
+        fi
+        [ "${1:-}" = APPLaunch.service ] || exit 2
+        state=$(cat "$FAKE_SYSTEMCTL_STATE")
+        case "$state" in
+            active)
+                [ "$quiet" -eq 1 ] || echo active
+                exit 0
+                ;;
+            inactive)
+                [ "$quiet" -eq 1 ] || echo inactive
+                exit 3
+                ;;
+            *) exit 1 ;;
+        esac
+        ;;
+    stop)
+        [ "${2:-}" = APPLaunch.service ] || exit 2
+        [ "${FAKE_SYSTEMCTL_STOP_FAIL:-0}" = 0 ] || exit 1
+        echo stop >>"$FAKE_SYSTEMCTL_LOG"
+        printf 'inactive\n' >"$FAKE_SYSTEMCTL_STATE"
+        ;;
+    start)
+        [ "${2:-}" = APPLaunch.service ] || exit 2
+        echo start >>"$FAKE_SYSTEMCTL_LOG"
+        printf 'active\n' >"$FAKE_SYSTEMCTL_STATE"
+        ;;
+    *) exit 2 ;;
+esac
+""",
+        )
+
+        write(launcher_state, "active\n")
 
         write(root / "etc/os-release", 'ID=debian\nVERSION_ID="13"\n')
         write(sys_root / "class/graphics/fb0/name", "fake-fb\n")
@@ -108,6 +154,8 @@ esac
             "ZERO_SDR_P0_DEV_ROOT": str(dev_root),
             "ZERO_SDR_P0_PROC_ROOT": str(proc_root),
             "ZERO_SDR_P0_APP": "/bin/true",
+            "FAKE_SYSTEMCTL_STATE": str(launcher_state),
+            "FAKE_SYSTEMCTL_LOG": str(launcher_log),
         })
         result = subprocess.run(
             [tool, "--preflight-only", "--output", str(output)],
@@ -118,12 +166,14 @@ esac
         )
         assert result.returncode == 0, result.stdout + result.stderr
         report = (output / "preflight.txt").read_text(encoding="utf-8")
-        assert "schema=zero-sdr-p0-v2" in report
+        assert "schema=zero-sdr-p0-v3" in report
         assert "preflight=PASS" in report
         assert "os_id=debian" in report
         assert "os_version=13" in report
         assert "plugdev_membership=present" in report
-        assert "package=install ok installed 0.1.0-3 arm64" in report
+        assert "launcher_service=active" in report
+        assert "app_processes=0" in report
+        assert "package=install ok installed 0.1.0-4 arm64" in report
         assert "rtl_runtime_package=install ok installed 2.0.2-2+b1 arm64" in report
         assert f"rtl_udev_rule=valid path={udev_rule}" in report
         assert "framebuffer_virtual_size=320,170" in report
@@ -136,6 +186,8 @@ esac
         assert "hostname=" not in report
         assert output.stat().st_mode & 0o777 == 0o700
         assert (output / "preflight.txt").stat().st_mode & 0o777 == 0o600
+        assert launcher_state.read_text(encoding="utf-8") == "active\n"
+        assert not launcher_log.exists()
 
         write(sys_root / "class/graphics/fb1/name", "redirected-fb\n")
         write(sys_root / "class/graphics/fb1/virtual_size", "320,170\n")
@@ -176,6 +228,44 @@ esac
         assert f"framebuffer={dev_root / 'fb0'} access=read-write" in lv_precedence_report
         assert "framebuffer_name=fake-fb" in lv_precedence_report
         assert "framebuffer_name=redirected-fb" not in lv_precedence_report
+
+        concurrent_process = proc_root / "4321"
+        concurrent_process.mkdir()
+        (concurrent_process / "exe").symlink_to("/bin/true")
+        concurrent_output = root / "concurrent-evidence"
+        result = subprocess.run(
+            [tool, "--preflight-only", "--output", str(concurrent_output)],
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        concurrent_report = (
+            concurrent_output / "preflight.txt"
+        ).read_text(encoding="utf-8")
+        assert "app_processes=1" in concurrent_report
+        assert "preflight=FAIL" in concurrent_report
+        (concurrent_process / "exe").unlink()
+        concurrent_process.rmdir()
+
+        write(launcher_state, "unavailable\n")
+        unavailable_launcher_output = root / "unavailable-launcher-evidence"
+        result = subprocess.run(
+            [tool, "--preflight-only", "--output", str(unavailable_launcher_output)],
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        unavailable_launcher_report = (
+            unavailable_launcher_output / "preflight.txt"
+        ).read_text(encoding="utf-8")
+        assert "launcher_service=unavailable" in unavailable_launcher_report
+        assert "preflight=FAIL" in unavailable_launcher_report
+        assert not launcher_log.exists()
+        write(launcher_state, "active\n")
 
         missing_dependency_environment = dict(environment)
         missing_dependency_environment["FAKE_RTL_PACKAGE_MISSING"] = "1"
@@ -260,6 +350,56 @@ esac
         assert "duration_complete=0" in short_result
         assert "app_exit_status=0" in short_result
         assert "forced_kill=0" in short_result
+        assert "launcher_was_active=1" in short_result
+        assert "launcher_stop_status=0" in short_result
+        assert "launcher_restart_status=0" in short_result
+        assert launcher_state.read_text(encoding="utf-8") == "active\n"
+        assert launcher_log.read_text(encoding="utf-8").splitlines() == [
+            "stop",
+            "start",
+        ]
+
+        launcher_log.unlink()
+        failed_pause_environment = dict(environment)
+        failed_pause_environment["FAKE_SYSTEMCTL_STOP_FAIL"] = "1"
+        failed_pause_output = root / "failed-pause-evidence"
+        result = subprocess.run(
+            [tool, "--duration", "60", "--interval", "1",
+             "--output", str(failed_pause_output)],
+            env=failed_pause_environment,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        assert "failed to pause APPLaunch.service" in result.stderr
+        assert launcher_state.read_text(encoding="utf-8") == "active\n"
+        assert launcher_log.read_text(encoding="utf-8").splitlines() == ["start"]
+        assert not (failed_pause_output / "app.log").exists()
+
+        launcher_log.unlink()
+        write(launcher_state, "inactive\n")
+        inactive_output = root / "inactive-launcher-evidence"
+        result = subprocess.run(
+            [tool, "--duration", "60", "--interval", "1",
+             "--output", str(inactive_output)],
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        inactive_result = (inactive_output / "result.txt").read_text(
+            encoding="utf-8"
+        )
+        assert "launcher_was_active=0" in inactive_result
+        assert "launcher_stop_status=not-needed" in inactive_result
+        assert "launcher_restart_status=not-needed" in inactive_result
+        assert launcher_state.read_text(encoding="utf-8") == "inactive\n"
+        assert not launcher_log.exists()
+        write(launcher_state, "active\n")
 
         (dev_root / "snd/pcmC0D0p").unlink()
         no_audio_output = root / "no-audio-evidence"

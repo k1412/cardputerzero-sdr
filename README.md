@@ -95,7 +95,7 @@ Generate eight reproducible receiver states—offline demo, fake-device `LIVE`, 
 
 The app writes one structured `diagnostics` record to standard output every 30 seconds. Each record contains cumulative connection/retry/read-error counts, IQ blocks and bytes, audio generated/written/dropped frames, ALSA recovery/failure counts, DSP processing time, UI-loop count, and maximum UI-loop gap. Set `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` to a value from 100 to 3,600,000 when a different interval is needed.
 
-The ARM64 package installs `cardputerzero-sdr-p0`, a non-root preflight and evidence runner. Do not launch a second Zero SDR instance from APPLaunch at the same time. From an SSH or local shell as the normal APPLaunch user, first verify the installed ARM64 app and `librtlsdr0` packages, `plugdev` membership, the distribution-owned RTL-SDR rule, a USB high-speed link, native 320×170 framebuffer access, the official APPLaunch/Cardputer keyboard path, RTL-SDR USB-node access, and a writable ALSA playback node:
+The ARM64 package installs `cardputerzero-sdr-p0`, a non-root preflight and evidence runner. Do not leave another Zero SDR instance running. From an SSH or local shell as the normal APPLaunch user, first verify the installed ARM64 app and `librtlsdr0` packages, `plugdev` membership, the distribution-owned RTL-SDR rule, a USB high-speed link, native 320×170 framebuffer access, the official APPLaunch/Cardputer keyboard path, RTL-SDR USB-node access, and a writable ALSA playback node:
 
 ```sh
 cardputerzero-sdr-p0 --preflight-only
@@ -105,11 +105,13 @@ Both the application and preflight honor `LV_LINUX_FBDEV_DEVICE` and
 `APPLAUNCH_LINUX_FBDEV_DEVICE` before falling back to `/dev/fb0`, matching the
 official Launcher handoff and keeping redirected display tests faithful.
 
-Then run the bounded 30-minute session and use the physical controls normally while it is active:
+The preflight is read-only and reports whether `APPLaunch.service` is active. Then run the bounded 30-minute session and use the physical controls normally while it is active:
 
 ```sh
 cardputerzero-sdr-p0 --duration 1800
 ```
+
+For the full run, the tool pauses an active `APPLaunch.service` through the normal user's systemd manager before it starts Zero SDR, then restores the launcher on completion, interruption, or an early app exit. This matches the launcher's exclusive-framebuffer contract without root access; the result records both transitions. The runner also refuses to start while another Zero SDR process exists.
 
 The runner creates a private evidence directory below `$XDG_STATE_HOME/cardputerzero-sdr/evidence/` (or `~/.local/state/`). It stores a sanitized hardware/access snapshot, `app.log`, process CPU/memory/temperature samples, and the exit result. It refuses root, excludes hostname/network state/USB serials, and stops the app through its tested clean `SIGTERM` path. Copy the evidence directory to a development checkout, then summarize the app log on the development machine:
 
@@ -127,7 +129,7 @@ The cross preset follows the official CardputerZero CMake template and downloads
 cmake --workflow --preset cp0-cross-package
 ```
 
-Expected package name: `dist/cardputerzero-sdr_0.1.0-3_arm64.deb`.
+Expected package name: `dist/cardputerzero-sdr_0.1.0-4_arm64.deb`.
 
 Do not treat a successful cross-build as device validation. Complete [the hardware test plan](docs/DEVICE_TEST_PLAN.md) before publishing a release.
 
@@ -153,7 +155,7 @@ See [Architecture](docs/ARCHITECTURE.md), [UX and controls](docs/UX.md), [Intern
 
 `app-builder.json` is prepared for the CardputerZero tooling, and all referenced screenshots are native 320×170 PNGs. Publication is held until the P0 hardware checks pass. The app does not install a root system service, an application-owned system udev rule, or any maintainer script, and it does not require network or cloud access. The package depends on Debian's `librtlsdr0`, whose distribution-owned rule grants the supported RTL-SDR devices to `plugdev`; the current device Store resolves this dependency through Debian's package manager. Access by the normal APPLaunch user remains a physical P0 gate. Device-package CI also runs the pinned, digest-verified install-path policy from the authoritative Store repository against every `.deb`.
 
-The package name is `cardputerzero-sdr`. An existing Store app named `zerosdr` is a separate project; this repository does not claim compatibility or ownership of it.
+The package name is `cardputerzero-sdr`, and its Store/APPLaunch title is `Zero SDR Keyboard`. An existing Store app named `zerosdr` is a separate project; the distinct listing title prevents ambiguity, and this repository does not claim compatibility or ownership of it.
 
 ## License
 

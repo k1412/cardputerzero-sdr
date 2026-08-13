@@ -95,7 +95,7 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 
 应用默认每 30 秒向标准输出写入一条结构化 `diagnostics` 记录，其中包含累计连接/重试/读取错误、IQ 数据块与字节数、音频生成/写入/丢帧、ALSA 恢复与故障、DSP 处理耗时、界面循环次数和最大界面循环间隔。需要调整周期时，可将 `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` 设置为 100–3,600,000 毫秒。
 
-ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设备预检与证据采集工具。运行时不要同时从 APPLaunch 启动第二个 Zero SDR 实例。先通过 SSH 或本地终端，以正常 APPLaunch 用户检查已安装的 ARM64 应用和 `librtlsdr0` 包、`plugdev` 成员资格、发行版维护的 RTL-SDR 规则、USB 高速链路、原生 320×170 帧缓冲、官方 APPLaunch/Cardputer 键盘路径、RTL-SDR USB 节点和可写 ALSA 播放节点：
+ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设备预检与证据采集工具。运行前不要留下另一个 Zero SDR 实例。先通过 SSH 或本地终端，以正常 APPLaunch 用户检查已安装的 ARM64 应用和 `librtlsdr0` 包、`plugdev` 成员资格、发行版维护的 RTL-SDR 规则、USB 高速链路、原生 320×170 帧缓冲、官方 APPLaunch/Cardputer 键盘路径、RTL-SDR USB 节点和可写 ALSA 播放节点：
 
 ```sh
 cardputerzero-sdr-p0 --preflight-only
@@ -105,11 +105,13 @@ cardputerzero-sdr-p0 --preflight-only
 `APPLAUNCH_LINUX_FBDEV_DEVICE`，最后才回退到 `/dev/fb0`；这与官方 Launcher
 向外部应用交接显示设备的方式一致，也能正确覆盖重定向帧缓冲的测试环境。
 
-然后启动有时间边界的 30 分钟测试；运行期间可正常使用实体按键操作应用：
+预检过程只读，并会报告 `APPLaunch.service` 是否正在运行。然后启动有时间边界的 30 分钟测试；运行期间可正常使用实体按键操作应用：
 
 ```sh
 cardputerzero-sdr-p0 --duration 1800
 ```
+
+完整测试会先通过当前普通用户的 systemd 管理器暂停活动中的 `APPLaunch.service`，再启动 Zero SDR；测试完成、被中断或应用提前退出时都会恢复启动器。这样无需 root 即可遵循 APPLaunch 的帧缓冲独占约定，结果文件也会记录暂停和恢复状态。工具还会在发现已有 Zero SDR 进程时拒绝启动。
 
 工具会在 `$XDG_STATE_HOME/cardputerzero-sdr/evidence/`（或 `~/.local/state/`）下创建权限收紧的证据目录，保存经过隐私筛选的硬件/权限快照、`app.log`、进程 CPU/内存/温度采样和退出结果。它会拒绝 root 运行，不采集主机名、网络状态或 USB 序列号，并通过已经测试的 `SIGTERM` 正常清理路径停止应用。把证据目录复制到开发机上的项目仓库，再汇总应用日志：
 
@@ -127,7 +129,7 @@ python3 scripts/summarize_diagnostics.py --p0 path/to/evidence/app.log
 cmake --workflow --preset cp0-cross-package
 ```
 
-预期安装包：`dist/cardputerzero-sdr_0.1.0-3_arm64.deb`。
+预期安装包：`dist/cardputerzero-sdr_0.1.0-4_arm64.deb`。
 
 交叉编译成功不等同于实机验证。发布前必须完成[硬件测试计划](docs/DEVICE_TEST_PLAN.md)中的检查。
 
@@ -153,7 +155,7 @@ docs/          架构、交互、语言和设备验证指南
 
 `app-builder.json` 已按 CardputerZero 工具准备，引用的截图均为原生 320×170 PNG。P0 实机检查通过前不会发布。应用不安装 root 系统服务、应用自有的系统 udev 规则或任何维护者脚本，也不需要网络或云端服务。安装包依赖 Debian 的 `librtlsdr0`，由该系统包维护的规则将受支持的 RTL-SDR 设备授权给 `plugdev`，当前设备商店会通过 Debian 包管理器解析这项依赖。正常 APPLaunch 用户的实机访问权限仍是 P0 发布门禁。设备打包 CI 还会下载官方商店仓库中固定提交的安装路径策略，在校验脚本摘要后对每个 `.deb` 执行同一套检查。
 
-安装包名为 `cardputerzero-sdr`。应用商店中已有的 `zerosdr` 是另一个项目；本仓库不声明与其兼容或拥有该名称。
+安装包名为 `cardputerzero-sdr`，在应用商店和 APPLaunch 中显示为 `Zero SDR Keyboard`（中文商店标题为“Zero SDR 键盘版”）。商店中已有的 `zerosdr` 是另一个项目；使用不同的展示名可避免混淆，本仓库不声明与其兼容或拥有该名称。
 
 ## 许可证
 

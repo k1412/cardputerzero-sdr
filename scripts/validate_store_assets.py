@@ -72,6 +72,8 @@ def main() -> int:
             raise ValueError(f"missing required field: {field}")
     if data["package_name"] != "cardputerzero-sdr" or data["bin_name"] != "cardputerzero-sdr":
         raise ValueError("package_name and bin_name must match the installed app")
+    if data["app_name"] != "Zero SDR Keyboard":
+        raise ValueError("app_name must distinguish this app from the existing zerosdr listing")
 
     store = data.get("store")
     if not isinstance(store, dict):
@@ -111,6 +113,8 @@ def main() -> int:
             raise ValueError(f"store.locales.{locale} must be an object")
         for field in ("title", "summary", "description"):
             require_text(localized.get(field), f"store.locales.{locale}.{field}")
+        if localized["title"].casefold().replace(" ", "") == "zerosdr":
+            raise ValueError(f"store.locales.{locale}.title collides with the existing zerosdr listing")
 
     print(
         f"validated {len(screenshots)} screenshots, {width}x{height} icon, "

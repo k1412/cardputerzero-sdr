@@ -5,7 +5,7 @@ WORKFLOW_PRESET="${WORKFLOW_PRESET:-cp0-cross-package}"
 REMOTE_USER="${REMOTE_USER:-}"
 REMOTE_HOST="${REMOTE_HOST:-}"
 REMOTE_DIR="${REMOTE_DIR:-/home/${REMOTE_USER}}"
-PACKAGE_GLOB="${PACKAGE_GLOB:-dist/Zero SDR_*_arm64.deb}"
+PACKAGE_GLOB="${PACKAGE_GLOB:-dist/cardputerzero-sdr_*_arm64.deb}"
 
 log() {
   printf '\n==> %s\n' "$*"

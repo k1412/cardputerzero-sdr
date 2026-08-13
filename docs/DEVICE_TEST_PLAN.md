@@ -51,13 +51,13 @@ Run this separately from hot-plug and failure-injection tests so intentional rec
 cardputerzero-sdr-p0 --preflight-only
 ```
 
-The preflight must report `schema=zero-sdr-p0-v2` and `preflight=PASS`. Confirm `plugdev_membership=present`, both package records are installed ARM64 builds, `rtl_udev_rule=valid`, and at least one accessible RTL-SDR reports `high_speed=1`; then inspect its framebuffer, input-event, USB-node, and ALSA facts rather than bypassing a failure with root. Keep audio unmuted on a known WFM station, then start the evidence run and exercise the physical controls while it remains active:
+The preflight must report `schema=zero-sdr-p0-v3` and `preflight=PASS`. Confirm `app_processes=0`, `launcher_service=active` or `inactive`, `plugdev_membership=present`, both package records are installed ARM64 builds, `rtl_udev_rule=valid`, and at least one accessible RTL-SDR reports `high_speed=1`; then inspect its framebuffer, input-event, USB-node, and ALSA facts rather than bypassing a failure with root. Keep audio unmuted on a known WFM station, then start the evidence run and exercise the physical controls while it remains active:
 
 ```sh
 cardputerzero-sdr-p0 --duration 1800
 ```
 
-The runner writes a mode-0700 evidence directory containing `preflight.txt`, `app.log`, `resources.csv`, and `result.txt`; the default location is below `$XDG_STATE_HOME/cardputerzero-sdr/evidence/` or `~/.local/state/`. It excludes hostname, network state, and USB serials. Copy that directory into a repository checkout on the development machine, then run:
+The full runner pauses an active `APPLaunch.service` as the same non-root user so the child exclusively owns the framebuffer, and restores it through the exit trap. Require `launcher_stop_status=0` and `launcher_restart_status=0` when `launcher_was_active=1`; `not-needed` is correct when the service was already inactive. The runner writes a mode-0700 evidence directory containing `preflight.txt`, `app.log`, `resources.csv`, and `result.txt`; the default location is below `$XDG_STATE_HOME/cardputerzero-sdr/evidence/` or `~/.local/state/`. It excludes hostname, network state, and USB serials. Copy that directory into a repository checkout on the development machine, then run:
 
 ```sh
 python3 scripts/summarize_diagnostics.py --p0 path/to/evidence/app.log
