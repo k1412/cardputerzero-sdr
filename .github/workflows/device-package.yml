@@ -32,7 +32,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
-            dpkg-dev fakeroot ca-certificates git
+            dpkg-dev fakeroot ca-certificates curl git
           python -m pip install --disable-pip-version-check "cmake>=3.31,<5" ninja
 
       - name: Cache Cardputer Zero BSP and fetched sources
@@ -54,6 +54,8 @@ jobs:
           test -n "$package"
           test "$(dpkg-deb -f "$package" Package)" = "cardputerzero-sdr"
           test "$(dpkg-deb -f "$package" Architecture)" = "arm64"
+          package_version=$(dpkg-deb -f "$package" Version)
+          test "$(basename "$package")" = "cardputerzero-sdr_${package_version}_arm64.deb"
           dpkg-deb -c "$package" | tee /tmp/package-contents.txt
           if grep -q '/systemd/system/' /tmp/package-contents.txt; then
             echo "unexpected system service in package" >&2
@@ -62,7 +64,7 @@ jobs:
           grep -q '/usr/bin/cardputerzero-sdr$' /tmp/package-contents.txt
           grep -q '/usr/bin/cardputerzero-sdr-p0$' /tmp/package-contents.txt
           grep -q '/etc/cardputerzero-sdr.conf$' /tmp/package-contents.txt
-          grep -q '/lib/udev/rules.d/60-cardputerzero-sdr-rtlsdr.rules$' /tmp/package-contents.txt
+          grep -q '/usr/share/APPLaunch/applications/cardputerzero-sdr.desktop$' /tmp/package-contents.txt
           grep -q '/usr/lib/cardputerzero-sdr/librtlsdr.so.2.0.3$' /tmp/package-contents.txt
           grep -q '/usr/share/doc/cardputerzero-sdr/README.md$' /tmp/package-contents.txt
           grep -q '/usr/share/doc/cardputerzero-sdr/README.zh-CN.md$' /tmp/package-contents.txt
@@ -74,15 +76,61 @@ jobs:
           "$package_root/usr/bin/cardputerzero-sdr-p0" --help | grep -q 'preflight-only'
           control_dir=$(mktemp -d)
           dpkg-deb -e "$package" "$control_dir"
-          test -x "$control_dir/postinst"
-          test -x "$control_dir/postrm"
-          sh -n "$control_dir/postinst"
-          sh -n "$control_dir/postrm"
-          udevadm verify packaging/60-cardputerzero-sdr-rtlsdr.rules
+          test ! -e "$control_dir/preinst"
+          test ! -e "$control_dir/postinst"
+          test ! -e "$control_dir/prerm"
+          test ! -e "$control_dir/postrm"
           depends=$(dpkg-deb -f "$package" Depends)
           grep -qw 'libasound2' <<<"$depends"
           grep -qw 'libusb-1.0-0' <<<"$depends"
+          grep -qw 'librtlsdr0' <<<"$depends"
           dpkg-deb -I "$package"
+
+      - name: Validate current Store server policy
+        shell: bash
+        env:
+          STORE_POLICY_COMMIT: f271a66ed8bb9a3d26a3d9baabf75c09b4d505c9
+          STORE_POLICY_SHA256: 754a7e07925dddd5964ae5a0a4def94a8e4a0e5456a83065f386c65490b9a564
+        run: |
+          set -euo pipefail
+          package=$(find dist -maxdepth 1 -name 'cardputerzero-sdr_*.deb' -print -quit)
+          test -n "$package"
+
+          policy=/tmp/cardputerzero-install-path-policy.py
+          curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+            "https://raw.githubusercontent.com/CardputerZero/packages/${STORE_POLICY_COMMIT}/.github/scripts/install_path_policy.py" \
+            --output "$policy"
+          printf '%s  %s\n' "$STORE_POLICY_SHA256" "$policy" | sha256sum --check --strict -
+
+          bad_paths=/tmp/store-bad-paths.txt
+          path_help=/tmp/store-path-help.md
+          python3 "$policy" cardputerzero-sdr "$package" "$bad_paths" "$path_help"
+          if test -s "$bad_paths"; then
+            echo "package violates the current Store install-path policy" >&2
+            cat "$bad_paths" >&2
+            exit 1
+          fi
+
+          dpkg-deb -c "$package" > /tmp/store-package-contents.txt
+          if awk '{print $1}' /tmp/store-package-contents.txt | grep -qE '^[-l].{2}[sS]|^[-l].{5}[sS]'; then
+            echo "package contains setuid/setgid files" >&2
+            exit 1
+          fi
+          if awk '{print $1}' /tmp/store-package-contents.txt | grep -qE '^[bc]'; then
+            echo "package contains device files" >&2
+            exit 1
+          fi
+
+          control_dir=$(mktemp -d)
+          dpkg-deb -e "$package" "$control_dir"
+          for maintainer_script in preinst postinst prerm postrm; do
+            script="$control_dir/$maintainer_script"
+            test -f "$script" || continue
+            if grep -qE 'rm[[:space:]]+(-[a-zA-Z]+[[:space:]]+)*(/([[:space:]]|$)|/(bin|etc|usr|var|home|boot|lib))|(curl|wget)[^|]*\|[[:space:]]*(ba)?sh|mkfs|/etc/(passwd|shadow|sudoers)|dd[[:space:]][^|]*of=/dev/' "$script"; then
+              echo "dangerous pattern in maintainer script: $maintainer_script" >&2
+              exit 1
+            fi
+          done
 
       - name: Upload ARM64 package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

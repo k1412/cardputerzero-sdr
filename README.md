@@ -27,7 +27,7 @@ Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. 
 - Structured 30-second receiver-health logs for IQ, audio, DSP, reconnect, and UI-loop measurements
 - Packaged non-root P0 preflight and bounded evidence runner with privacy-filtered hardware/resource facts
 - Audited ARM64 Debian package with a private pinned librtlsdr runtime
-- Narrow `plugdev`/`uaccess` rules for the tested Realtek RTL2832U USB IDs; no root service
+- Debian-owned RTL-SDR `plugdev` permissions through `librtlsdr0`; no app-owned udev rule or root service
 - Ten UI languages: English, Simplified Chinese, Traditional Chinese, Spanish, Japanese, Korean, French, German, Brazilian Portuguese, and Russian
 - Linux/macOS/Windows desktop simulator support inherited from the official CardputerZero template
 - Host tests for tuning, FFT/WFM DSP, runtime-loaded RTL-SDR and ALSA boundaries, reconnect behavior, settings persistence, and translation completeness
@@ -151,7 +151,7 @@ See [Architecture](docs/ARCHITECTURE.md), [UX and controls](docs/UX.md), [Intern
 
 ## Store release policy
 
-`app-builder.json` is prepared for the CardputerZero tooling, and all referenced screenshots are native 320×170 PNGs. Publication is held until the P0 hardware checks pass. The app does not install a root system service and does not require network or cloud access. Its udev rules grant only the tested Realtek `0bda:2832` and `0bda:2838` IDs to Debian's `plugdev` group/active-seat ACL; real-device permission behavior remains a P0 check.
+`app-builder.json` is prepared for the CardputerZero tooling, and all referenced screenshots are native 320×170 PNGs. Publication is held until the P0 hardware checks pass. The app does not install a root system service, an application-owned system udev rule, or any maintainer script, and it does not require network or cloud access. The package depends on Debian's `librtlsdr0`, whose distribution-owned rule grants the supported RTL-SDR devices to `plugdev`; the current device Store resolves this dependency through Debian's package manager. Access by the normal APPLaunch user remains a physical P0 gate. Device-package CI also runs the pinned, digest-verified install-path policy from the authoritative Store repository against every `.deb`.
 
 The package name is `cardputerzero-sdr`. An existing Store app named `zerosdr` is a separate project; this repository does not claim compatibility or ownership of it.
 

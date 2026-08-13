@@ -65,4 +65,4 @@ The application converts `SIGINT` and `SIGTERM` into a main-loop stop request, t
 
 ## Dependency policy
 
-LVGL is pinned to 9.5.0. Fetched libraries use immutable release tags or hashed release archives. RTL-SDR and ALSA use runtime discovery so the app still opens cleanly when a dongle or audio route is absent. Cardputer packages bundle pinned librtlsdr 2.0.3 privately and use the BSP's declared libusb and ALSA runtimes. A narrow udev rule covers only Realtek `0bda:2832/2838`, matching Debian's `plugdev` convention while adding active-seat `uaccess`; it does not run the app as root.
+LVGL is pinned to 9.5.0. Fetched libraries use immutable release tags or hashed release archives. RTL-SDR and ALSA use runtime discovery so the app still opens cleanly when a dongle or audio route is absent. Cardputer packages bundle pinned librtlsdr 2.0.3 privately and use the BSP's declared libusb and ALSA runtimes. They also depend on Debian's `librtlsdr0` package for the distribution-owned RTL-SDR udev policy. Zero SDR installs no application-owned system rule and does not run as root.

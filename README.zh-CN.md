@@ -27,7 +27,7 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 - 每 30 秒输出结构化接收健康日志，记录 IQ、音频、DSP、重连和界面循环指标
 - 随包提供无需 root 的 P0 预检与限时证据采集工具，并对硬件/资源信息做隐私筛选
 - 经审计的 ARM64 Debian 安装包，内含固定版本的私有 librtlsdr 运行库
-- 仅针对已测试 Realtek RTL2832U USB ID 的 `plugdev`/`uaccess` 规则；不安装 root 服务
+- 通过 Debian `librtlsdr0` 提供系统维护的 RTL-SDR `plugdev` 权限；应用不自带 udev 规则或 root 服务
 - 十种界面语言：英语、简体中文、繁体中文、西班牙语、日语、韩语、法语、德语、巴西葡萄牙语和俄语
 - 继承官方 CardputerZero 模板的 Linux/macOS/Windows 桌面模拟器支持
 - 覆盖调谐、FFT/WFM DSP、RTL-SDR/ALSA 动态边界、重连、设置持久化和翻译完整性的主机测试
@@ -151,7 +151,7 @@ docs/          架构、交互、语言和设备验证指南
 
 ## 应用商店发布策略
 
-`app-builder.json` 已按 CardputerZero 工具准备，引用的截图均为原生 320×170 PNG。P0 实机检查通过前不会发布。应用不会安装 root 系统服务，也不需要网络或云端服务。udev 规则只向 Debian `plugdev` 组/活动会话 ACL 开放已测试的 Realtek `0bda:2832` 和 `0bda:2838`，实机权限表现仍属于 P0 检查。
+`app-builder.json` 已按 CardputerZero 工具准备，引用的截图均为原生 320×170 PNG。P0 实机检查通过前不会发布。应用不安装 root 系统服务、应用自有的系统 udev 规则或任何维护者脚本，也不需要网络或云端服务。安装包依赖 Debian 的 `librtlsdr0`，由该系统包维护的规则将受支持的 RTL-SDR 设备授权给 `plugdev`，当前设备商店会通过 Debian 包管理器解析这项依赖。正常 APPLaunch 用户的实机访问权限仍是 P0 发布门禁。设备打包 CI 还会下载官方商店仓库中固定提交的安装路径策略，在校验脚本摘要后对每个 `.deb` 执行同一套检查。
 
 安装包名为 `cardputerzero-sdr`。应用商店中已有的 `zerosdr` 是另一个项目；本仓库不声明与其兼容或拥有该名称。
 

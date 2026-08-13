@@ -39,9 +39,6 @@ install(PROGRAMS "${CMAKE_CURRENT_SOURCE_DIR}/scripts/cardputerzero-sdr-p0"
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/cardputerzero-sdr.conf"
     DESTINATION "/etc"
 )
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/60-cardputerzero-sdr-rtlsdr.rules"
-    DESTINATION "/lib/udev/rules.d"
-)
 
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/${APP_NAME}/fonts"
@@ -106,7 +103,7 @@ set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE "${APP_DEBIAN_ARCHITECTURE}")
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "${APP_MAINTAINER}")
 set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
 set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
-set(APP_DEBIAN_DEPENDS "libc6, libstdc++6, libgcc-s1, libfreetype6, libpng16-16, libjpeg62-turbo, zlib1g, libasound2, libusb-1.0-0")
+set(APP_DEBIAN_DEPENDS "libc6, libstdc++6, libgcc-s1, libfreetype6, libpng16-16, libjpeg62-turbo, zlib1g, libasound2, libusb-1.0-0, librtlsdr0")
 if(FMT_INCLUDE_DIR AND FMT_LIBRARY)
     string(APPEND APP_DEBIAN_DEPENDS ", libfmt10")
 endif()
@@ -119,21 +116,8 @@ configure_file(
     "${APP_GENERATED_DIR}/conffiles"
     @ONLY
 )
-configure_file(
-    "${CMAKE_CURRENT_LIST_DIR}/templates/postinst.in"
-    "${APP_GENERATED_DIR}/postinst"
-    @ONLY
-)
-configure_file(
-    "${CMAKE_CURRENT_LIST_DIR}/templates/postrm.in"
-    "${APP_GENERATED_DIR}/postrm"
-    @ONLY
-)
-file(CHMOD "${APP_GENERATED_DIR}/postinst" "${APP_GENERATED_DIR}/postrm"
-    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-)
 set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
-    "${APP_GENERATED_DIR}/conffiles;${APP_GENERATED_DIR}/postinst;${APP_GENERATED_DIR}/postrm"
+    "${APP_GENERATED_DIR}/conffiles"
 )
 
 include(CPack)

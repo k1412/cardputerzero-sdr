@@ -16,7 +16,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 - CardputerZero Store manifest, icon, screenshots, and release gates
 - Runtime-loaded RTL-SDR device session with reconnect, live IQ spectrum, channel-filtered/DC-blocked WFM mono demodulation, stereo-pilot alias rejection, and bounded ALSA output
 - Atomic persistence for frequency, tuning step, gain, mute, theme, and language with strict range validation
-- Narrow udev permissions for Realtek RTL2832U `0bda:2832/2838` without a root service
+- Debian `librtlsdr0` runtime dependency for distribution-owned RTL-SDR USB permissions without a root service
 - Graceful audio-only degradation with translated `NO AUDIO` feedback while RF and spectrum remain live
 - Context-aware key-repeat policy that prevents held discrete keys from toggling values or pages repeatedly
 - Device-reported discrete tuner gain profiles with nearest-value enforcement and full FC0012 negative-gain support
@@ -29,6 +29,8 @@ All notable changes will be documented here. The project follows Semantic Versio
 - APPLaunch-matched 500/50 ms userspace key repeat for the non-autorepeating TCA8418 driver
 - APPLaunch/LVGL framebuffer-device overrides in both the application and P0 preflight, with the build-time `/dev/fb0` fallback retained
 - SHA-256 verification for downloaded and cached copies of the official v0.0.4 Cardputer Zero BSP
+- Store-compliant packaging with no application-owned system udev rule or maintainer scripts
+- Device-package CI enforcement of the pinned authoritative Store install-path and archive-safety policy
 
 ### Known limitations
 
