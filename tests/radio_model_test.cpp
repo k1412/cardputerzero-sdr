@@ -35,6 +35,11 @@ int main() {
     radio.adjust_gain(1);
     assert(!radio.automatic_gain());
     assert(radio.gain_tenths_db() == 210);
+    radio.set_gain(true, 999);
+    assert(radio.automatic_gain());
+    assert(radio.gain_tenths_db() == 490);
+    radio.set_muted(true);
+    assert(radio.muted());
 
     radio.toggle_page();
     assert(radio.current_page() == model::AppPage::Settings);

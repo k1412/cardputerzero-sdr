@@ -14,6 +14,7 @@
 #include "base_viewmodel.h"
 #include "theme.h"
 
+#include <array>
 #include <cstdlib>
 #include <filesystem>
 #include <string>
@@ -59,9 +60,30 @@ void quit_requested_observer(lv_observer_t* observer, lv_subject_t* subject) {
 struct SettingsPersistence {
     std::string config_path;
     viewmodel::BaseViewModel* view_model;
-    bool last_dark_mode;
-    int last_locale;
+    ApplicationConfig last_saved;
 };
+
+ApplicationConfig current_config(const viewmodel::BaseViewModel& view_model) {
+    ApplicationConfig config;
+    config.dark_mode = view_model.is_dark_mode();
+    config.locale = i18n::locale_info(view_model.locale()).code;
+    config.frequency_hz = view_model.frequency_hz();
+    config.tuning_step_index = view_model.tuning_step_index();
+    config.automatic_gain = view_model.automatic_gain();
+    config.gain_tenths_db = view_model.gain_tenths_db();
+    config.muted = view_model.is_muted();
+    return config;
+}
+
+bool same_config(const ApplicationConfig& left, const ApplicationConfig& right) {
+    return left.dark_mode == right.dark_mode &&
+           left.locale == right.locale &&
+           left.frequency_hz == right.frequency_hz &&
+           left.tuning_step_index == right.tuning_step_index &&
+           left.automatic_gain == right.automatic_gain &&
+           left.gain_tenths_db == right.gain_tenths_db &&
+           left.muted == right.muted;
+}
 
 std::string writable_config_path() {
 #if USE_DESKTOP
@@ -89,23 +111,21 @@ void persist_settings_observer(lv_observer_t* observer, lv_subject_t* subject) {
     if (!persistence) {
         return;
     }
-    const bool dark_mode = persistence->view_model->is_dark_mode();
-    const int locale = static_cast<int>(persistence->view_model->locale());
-    if (dark_mode == persistence->last_dark_mode && locale == persistence->last_locale) {
-        return;
-    }
-    persistence->last_dark_mode = dark_mode;
-    persistence->last_locale = locale;
+    const auto config = current_config(*persistence->view_model);
+    if (same_config(config, persistence->last_saved)) return;
 
-    ApplicationConfig config;
-    config.dark_mode = dark_mode;
-    config.locale = i18n::locale_info(persistence->view_model->locale()).code;
     std::string error;
     if (save_application_config(persistence->config_path, config, error)) {
-        LOG_INFO("saved config: {} (dark_mode={}, locale={})",
+        persistence->last_saved = config;
+        LOG_INFO("saved config: {} (dark_mode={}, locale={}, frequency_hz={}, step={}, auto_gain={}, gain={}, muted={})",
                  persistence->config_path,
                  config.dark_mode ? "yes" : "no",
-                 config.locale);
+                 config.locale,
+                 config.frequency_hz,
+                 config.tuning_step_index,
+                 config.automatic_gain ? "yes" : "no",
+                 config.gain_tenths_db,
+                 config.muted ? "yes" : "no");
     } else {
         LOG_WARN("failed to save config {}: {}", persistence->config_path, error);
     }
@@ -176,10 +196,20 @@ int Application::run() {
                 break;
             }
         }
-        LOG_INFO("loaded config: {} (dark_mode={}, locale={})",
+        view_model.restore_radio_settings(config.frequency_hz,
+                                          config.tuning_step_index,
+                                          config.automatic_gain,
+                                          config.gain_tenths_db,
+                                          config.muted);
+        LOG_INFO("loaded config: {} (dark_mode={}, locale={}, frequency_hz={}, step={}, auto_gain={}, gain={}, muted={})",
                  loaded_config_path,
                  config.dark_mode ? "yes" : "no",
-                 config.locale);
+                 config.locale,
+                 config.frequency_hz,
+                 config.tuning_step_index,
+                 config.automatic_gain ? "yes" : "no",
+                 config.gain_tenths_db,
+                 config.muted ? "yes" : "no");
     } else {
         LOG_WARN("failed to load config {}: {}; using defaults", loaded_config_path, config_error);
     }
@@ -223,15 +253,16 @@ int Application::run() {
     SettingsPersistence settings_persistence{
         user_config_path,
         &view_model,
-        view_model.is_dark_mode(),
-        static_cast<int>(view_model.locale()),
+        current_config(view_model),
     };
-    auto* dark_mode_observer = lv_subject_add_observer(view_model.dark_mode_subject(),
-                                                        persist_settings_observer,
-                                                        &settings_persistence);
-    auto* locale_observer = lv_subject_add_observer(view_model.locale_subject(),
-                                                     persist_settings_observer,
-                                                     &settings_persistence);
+    const std::array<lv_observer_t*, 6> settings_observers = {{
+        lv_subject_add_observer(view_model.dark_mode_subject(), persist_settings_observer, &settings_persistence),
+        lv_subject_add_observer(view_model.locale_subject(), persist_settings_observer, &settings_persistence),
+        lv_subject_add_observer(view_model.frequency_subject(), persist_settings_observer, &settings_persistence),
+        lv_subject_add_observer(view_model.step_subject(), persist_settings_observer, &settings_persistence),
+        lv_subject_add_observer(view_model.gain_subject(), persist_settings_observer, &settings_persistence),
+        lv_subject_add_observer(view_model.muted_subject(), persist_settings_observer, &settings_persistence),
+    }};
 
     bool running = true;
     auto* quit_observer = lv_subject_add_observer(view_model.quit_requested_subject(),
@@ -266,11 +297,8 @@ int Application::run() {
     if (quit_observer) {
         lv_observer_remove(quit_observer);
     }
-    if (dark_mode_observer) {
-        lv_observer_remove(dark_mode_observer);
-    }
-    if (locale_observer) {
-        lv_observer_remove(locale_observer);
+    for (auto* observer : settings_observers) {
+        if (observer) lv_observer_remove(observer);
     }
 
     return 0;

@@ -45,10 +45,12 @@ public:
     void cycle_tuning_step(int direction);
 
     bool muted() const;
+    void set_muted(bool muted);
     void toggle_muted();
 
     bool automatic_gain() const;
     int gain_tenths_db() const;
+    void set_gain(bool automatic_gain, int gain_tenths_db);
     void toggle_gain_mode();
     void adjust_gain(int direction);
 

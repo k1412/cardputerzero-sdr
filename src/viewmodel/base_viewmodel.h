@@ -51,9 +51,17 @@ public:
     void toggle_muted();
     void cycle_locale(int direction = 1);
     void set_locale(i18n::Locale locale);
+    void restore_radio_settings(uint32_t frequency_hz,
+                                size_t tuning_step_index,
+                                bool automatic_gain,
+                                int gain_tenths_db,
+                                bool muted);
     void request_quit();
 
     uint32_t frequency_hz() const;
+    size_t tuning_step_index() const;
+    bool automatic_gain() const;
+    int gain_tenths_db() const;
     bool is_muted() const;
     i18n::Locale locale() const;
     const char* text(i18n::Text text) const;

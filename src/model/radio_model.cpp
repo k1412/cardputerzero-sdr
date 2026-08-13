@@ -53,6 +53,10 @@ bool RadioModel::muted() const {
     return muted_;
 }
 
+void RadioModel::set_muted(bool muted) {
+    muted_ = muted;
+}
+
 void RadioModel::toggle_muted() {
     muted_ = !muted_;
 }
@@ -63,6 +67,11 @@ bool RadioModel::automatic_gain() const {
 
 int RadioModel::gain_tenths_db() const {
     return gain_tenths_db_;
+}
+
+void RadioModel::set_gain(bool automatic_gain, int gain_tenths_db) {
+    automatic_gain_ = automatic_gain;
+    gain_tenths_db_ = std::clamp(gain_tenths_db, 0, 490);
 }
 
 void RadioModel::toggle_gain_mode() {

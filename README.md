@@ -1,6 +1,9 @@
 # Zero SDR for Cardputer Zero
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 [![CI](https://github.com/k1412/cardputerzero-sdr/actions/workflows/ci.yml/badge.svg)](https://github.com/k1412/cardputerzero-sdr/actions/workflows/ci.yml)
+[![Device Package](https://github.com/k1412/cardputerzero-sdr/actions/workflows/device-package.yml/badge.svg)](https://github.com/k1412/cardputerzero-sdr/actions/workflows/device-package.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-35dcc8.svg)](LICENSE)
 
 Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. The UI is rendered at the device's native 320×170 resolution and is designed around its physical `F/X/Z/C`, Enter, and Esc controls.
@@ -18,6 +21,9 @@ Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. 
 - Frequency clamp matching the tested FC0012 dongle: 22.0–948.6 MHz
 - Six tuning steps from 10 kHz to 1 MHz
 - Automatic/manual gain state, mute state, dark/light theme
+- Last-used frequency, tuning step, gain, mute, theme, and language persist across launches
+- Runtime-loaded RTL-SDR capture, channel-filtered WFM audio, and automatic reconnect
+- Audited ARM64 Debian package with a private pinned librtlsdr runtime
 - Ten UI languages: English, Simplified Chinese, Traditional Chinese, Spanish, Japanese, Korean, French, German, Brazilian Portuguese, and Russian
 - Linux/macOS/Windows desktop simulator support inherited from the official CardputerZero template
 - Host tests for tuning, FFT/WFM DSP, runtime-loaded RTL-SDR and ALSA boundaries, reconnect behavior, settings persistence, and translation completeness
@@ -25,7 +31,6 @@ Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. 
 Not implemented or verified yet:
 
 - RTL-SDR USB capture and audio on physical Cardputer Zero hardware
-- Persistence beyond theme selection
 - ARM64 `.deb` installation on real hardware
 - CardputerZero Store submission
 
@@ -90,10 +95,12 @@ Do not treat a successful cross-build as device validation. Complete [the hardwa
 
 ```text
 src/app/       lifecycle, assets, simulator, screen switching
-src/dsp/       deterministic spectrum source; live DSP will live here
+src/audio/     bounded runtime-loaded ALSA output
+src/device/    RTL-SDR discovery/capture and receiver worker lifetime
+src/dsp/       deterministic demo, FFT spectrum, channel filter, WFM demodulation
 src/i18n/      locale catalog and font selection
 src/model/     bounded radio state
-src/platform/  keyboard/evdev and future RTL-SDR/audio adapters
+src/platform/  SDL/DRM display and keyboard/evdev adapters
 src/view/      LVGL screens, widgets, and 320×170 theme
 src/viewmodel/ state formatting and UI actions
 tests/         host-runnable unit tests

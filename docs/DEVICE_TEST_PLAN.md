@@ -29,7 +29,7 @@ This establishes the dongle baseline only. It does not prove Cardputer Zero USB-
 | WFM audio | Receive a known station, mute/unmute, unplug device | intelligible audio; no loud transient; mute is immediate | Pending device |
 | Performance | Record CPU, memory, UI frame cadence, audio underruns | thresholds documented from real measurements | Pending device |
 | Locales | Open radio/settings in all ten languages | glyphs render; no clipping or crash | Pending device |
-| Persistence | Toggle theme, restart app | setting survives and app can recover from malformed config | Pending device |
+| Persistence | Change frequency/step/gain/mute/theme/language, restart app | all survive and app can recover from malformed config | Pending device |
 
 ## Failure injection
 

@@ -181,12 +181,39 @@ void BaseViewModel::set_locale(i18n::Locale locale) {
     publish_radio_state();
 }
 
+void BaseViewModel::restore_radio_settings(uint32_t frequency_hz,
+                                           size_t tuning_step_index,
+                                           bool automatic_gain,
+                                           int gain_tenths_db,
+                                           bool muted) {
+    model_.set_frequency_hz(frequency_hz);
+    model_.set_tuning_step_index(tuning_step_index);
+    model_.set_gain(automatic_gain, gain_tenths_db);
+    model_.set_muted(muted);
+    radio_session_.request_frequency(model_.frequency_hz());
+    radio_session_.request_gain(model_.automatic_gain(), model_.gain_tenths_db());
+    radio_session_.request_muted(model_.muted());
+    publish_radio_state();
+}
+
 void BaseViewModel::request_quit() {
     quit_requested_subject_.set(true);
 }
 
 uint32_t BaseViewModel::frequency_hz() const {
     return model_.frequency_hz();
+}
+
+size_t BaseViewModel::tuning_step_index() const {
+    return model_.tuning_step_index();
+}
+
+bool BaseViewModel::automatic_gain() const {
+    return model_.automatic_gain();
+}
+
+int BaseViewModel::gain_tenths_db() const {
+    return model_.gain_tenths_db();
 }
 
 bool BaseViewModel::is_muted() const {
