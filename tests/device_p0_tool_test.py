@@ -53,6 +53,8 @@ def main() -> int:
         write(sys_root / "class/thermal/thermal_zone0/temp", "42000\n")
 
         environment = dict(os.environ)
+        environment.pop("LV_LINUX_FBDEV_DEVICE", None)
+        environment.pop("APPLAUNCH_LINUX_FBDEV_DEVICE", None)
         environment.pop("LV_LINUX_KEYBOARD_DEVICE", None)
         environment.pop("APPLAUNCH_LINUX_KEYBOARD_DEVICE", None)
         environment.update({
@@ -81,6 +83,46 @@ def main() -> int:
         assert "hostname=" not in report
         assert output.stat().st_mode & 0o777 == 0o700
         assert (output / "preflight.txt").stat().st_mode & 0o777 == 0o600
+
+        write(sys_root / "class/graphics/fb1/name", "redirected-fb\n")
+        write(sys_root / "class/graphics/fb1/virtual_size", "320,170\n")
+        write(sys_root / "class/graphics/fb1/bits_per_pixel", "16\n")
+        write(dev_root / "fb1", "")
+        redirected_environment = dict(environment)
+        redirected_environment["APPLAUNCH_LINUX_FBDEV_DEVICE"] = str(dev_root / "fb1")
+        redirected_output = root / "redirected-evidence"
+        result = subprocess.run(
+            [tool, "--preflight-only", "--output", str(redirected_output)],
+            env=redirected_environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        redirected_report = (
+            redirected_output / "preflight.txt"
+        ).read_text(encoding="utf-8")
+        assert f"framebuffer={dev_root / 'fb1'} access=read-write" in redirected_report
+        assert "framebuffer_name=redirected-fb" in redirected_report
+        assert "preflight=PASS" in redirected_report
+
+        lv_precedence_environment = dict(redirected_environment)
+        lv_precedence_environment["LV_LINUX_FBDEV_DEVICE"] = str(dev_root / "fb0")
+        lv_precedence_output = root / "lv-precedence-evidence"
+        result = subprocess.run(
+            [tool, "--preflight-only", "--output", str(lv_precedence_output)],
+            env=lv_precedence_environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        lv_precedence_report = (
+            lv_precedence_output / "preflight.txt"
+        ).read_text(encoding="utf-8")
+        assert f"framebuffer={dev_root / 'fb0'} access=read-write" in lv_precedence_report
+        assert "framebuffer_name=fake-fb" in lv_precedence_report
+        assert "framebuffer_name=redirected-fb" not in lv_precedence_report
 
         short_output = root / "short-evidence"
         result = subprocess.run(

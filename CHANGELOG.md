@@ -27,6 +27,8 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Graceful `SIGINT`/`SIGTERM` shutdown through the normal receiver and audio cleanup path
 - APPLaunch-aware Cardputer keyboard discovery with strict full-control capability matching and single-device fallback
 - APPLaunch-matched 500/50 ms userspace key repeat for the non-autorepeating TCA8418 driver
+- APPLaunch/LVGL framebuffer-device overrides in both the application and P0 preflight, with the build-time `/dev/fb0` fallback retained
+- SHA-256 verification for downloaded and cached copies of the official v0.0.4 Cardputer Zero BSP
 
 ### Known limitations
 

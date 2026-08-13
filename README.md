@@ -101,6 +101,10 @@ The ARM64 package installs `cardputerzero-sdr-p0`, a non-root preflight and evid
 cardputerzero-sdr-p0 --preflight-only
 ```
 
+Both the application and preflight honor `LV_LINUX_FBDEV_DEVICE` and
+`APPLAUNCH_LINUX_FBDEV_DEVICE` before falling back to `/dev/fb0`, matching the
+official Launcher handoff and keeping redirected display tests faithful.
+
 Then run the bounded 30-minute session and use the physical controls normally while it is active:
 
 ```sh
@@ -136,14 +140,14 @@ src/device/    RTL-SDR discovery/capture and receiver worker lifetime
 src/dsp/       deterministic demo, FFT spectrum, channel filter, WFM demodulation
 src/i18n/      locale catalog and font selection
 src/model/     bounded radio state
-src/platform/  SDL/DRM display and keyboard/evdev adapters
+src/platform/  framebuffer/DRM selection and keyboard/evdev adapters
 src/view/      LVGL screens, widgets, and 320×170 theme
 src/viewmodel/ state formatting and UI actions
 tests/         host-runnable unit tests
 docs/          architecture, UX, language, and device validation guides
 ```
 
-See [Architecture](docs/ARCHITECTURE.md), [UX and controls](docs/UX.md), [Internationalization](docs/I18N.md), and [Contributing](CONTRIBUTING.md).
+See [Architecture](docs/ARCHITECTURE.md), [UX and controls](docs/UX.md), [Internationalization](docs/I18N.md), [Upstream compatibility](docs/UPSTREAM_COMPATIBILITY.md), and [Contributing](CONTRIBUTING.md).
 
 ## Store release policy
 

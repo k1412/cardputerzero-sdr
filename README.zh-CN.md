@@ -101,6 +101,10 @@ ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设
 cardputerzero-sdr-p0 --preflight-only
 ```
 
+应用和预检工具都会依次采用 `LV_LINUX_FBDEV_DEVICE`、
+`APPLAUNCH_LINUX_FBDEV_DEVICE`，最后才回退到 `/dev/fb0`；这与官方 Launcher
+向外部应用交接显示设备的方式一致，也能正确覆盖重定向帧缓冲的测试环境。
+
 然后启动有时间边界的 30 分钟测试；运行期间可正常使用实体按键操作应用：
 
 ```sh
@@ -136,14 +140,14 @@ src/device/    RTL-SDR 发现/采集与接收工作线程生命周期
 src/dsp/       可复现演示、FFT 频谱、信道滤波和 WFM 解调
 src/i18n/      语言目录与字体选择
 src/model/     有边界的无线电状态
-src/platform/  SDL/DRM 显示和键盘/evdev 适配
+src/platform/  帧缓冲/DRM 选择和键盘/evdev 适配
 src/view/      LVGL 页面、组件和 320×170 主题
 src/viewmodel/ 状态格式化与界面操作
 tests/         可在主机运行的单元及集成测试
 docs/          架构、交互、语言和设备验证指南
 ```
 
-更多信息请参阅[架构](docs/ARCHITECTURE.md)、[交互与按键](docs/UX.md)、[国际化](docs/I18N.md)和[贡献指南](CONTRIBUTING.md)。
+更多信息请参阅[架构](docs/ARCHITECTURE.md)、[交互与按键](docs/UX.md)、[国际化](docs/I18N.md)、[上游兼容性审计](docs/UPSTREAM_COMPATIBILITY.md)和[贡献指南](CONTRIBUTING.md)。
 
 ## 应用商店发布策略
 

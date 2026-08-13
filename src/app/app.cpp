@@ -8,6 +8,7 @@
 
 #include "application_config.h"
 #include "asset_manager.h"
+#include "display_device.h"
 #include "logger.h"
 #include "linux_input.h"
 #include "screen_manager.h"
@@ -32,10 +33,6 @@
 #else
 #include "src/drivers/display/fb/lv_linux_fbdev.h"
 #endif
-#endif
-
-#ifndef APP_FRAMEBUFFER_DEVICE
-#define APP_FRAMEBUFFER_DEVICE "/dev/fb0"
 #endif
 
 #ifndef APP_DRM_DEVICE
@@ -174,7 +171,10 @@ lv_display_t* init_device_display() {
         return nullptr;
     }
 
-    if (lv_linux_fbdev_set_file(display, APP_FRAMEBUFFER_DEVICE) != LV_RESULT_OK) {
+    const std::string framebuffer = platform::framebuffer_device();
+    LOG_INFO("using framebuffer device: {}", framebuffer);
+    if (lv_linux_fbdev_set_file(display, framebuffer.c_str()) != LV_RESULT_OK) {
+        LOG_ERROR("failed to open framebuffer device: {}", framebuffer);
         lv_display_delete(display);
         return nullptr;
     }

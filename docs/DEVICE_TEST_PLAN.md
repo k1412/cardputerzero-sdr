@@ -20,7 +20,7 @@ This establishes the dongle baseline only. It does not prove Cardputer Zero USB-
 | Area | Procedure | Pass criterion | Status |
 | --- | --- | --- | --- |
 | Install | Install release `.deb`, launch from APPLaunch | correct icon/title; clean start/exit | Pending device |
-| Display | Inspect radio/settings in dark and light themes | no clipping, tearing, overlays, or unreadable text | Pending device |
+| Display | Inspect radio/settings in dark and light themes; repeat once with the framebuffer path exported by APPLaunch | selected path and native 320×170 mode are logged; no clipping, tearing, overlays, or unreadable text | Pending device |
 | Keys | Exercise F/X/Z/C, Enter, Esc, G/M/L/T, number row, period, Backspace, and hold-to-repeat | one action per press; repeat is controlled; Esc returns safely | Pending device |
 | USB discovery | Cold boot, hot-plug, unplug/replug RTL2832U | state changes without crash; UI stays responsive | Pending device |
 | USB power | Capture continuously with screen/audio active | no brownout, disconnect loop, or thermal warning | Pending device |

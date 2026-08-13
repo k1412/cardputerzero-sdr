@@ -17,8 +17,20 @@ set(_CP0_DEFAULT_SYSROOT "${_CP0_CACHE_DIR}/sdk_bsp-src")
 
 set(CM0_SDK_ROOT "${_CP0_DEFAULT_SYSROOT}" CACHE PATH "Path to CM0/CardputerZero BSP sysroot")
 set(CM0_SDK_VERSION "v0.0.4" CACHE STRING "CM0/CardputerZero BSP release version")
-set(CM0_SDK_URL "https://github.com/CardputerZero/M5CardputerZero-UserDemo/releases/download/${CM0_SDK_VERSION}/sdk_bsp.tar.gz" CACHE STRING "CM0/CardputerZero BSP archive URL")
+set(CM0_SDK_URL "https://github.com/CardputerZero/launcher/releases/download/${CM0_SDK_VERSION}/sdk_bsp.tar.gz" CACHE STRING "CM0/CardputerZero BSP archive URL")
+set(CM0_SDK_SHA256 "e51b6eb803ed08f450e459efbfe62dd0341440846f3be9d01da861fe6cfdebb0" CACHE STRING "Expected SHA-256 for the official CM0/CardputerZero BSP archive")
 set(CM0_ALLOW_FETCH_DEPS ON CACHE BOOL "Allow downloading the CM0/CardputerZero BSP when the sysroot is missing")
+set(_CP0_SDK_ARCHIVE "${_CP0_CACHE_DIR}/sdk_bsp.tar.gz")
+
+if(EXISTS "${_CP0_SDK_ARCHIVE}")
+    file(SHA256 "${_CP0_SDK_ARCHIVE}" _CP0_CACHED_SDK_SHA256)
+    if(NOT _CP0_CACHED_SDK_SHA256 STREQUAL CM0_SDK_SHA256)
+        message(FATAL_ERROR
+            "Cached CM0 BSP digest mismatch: ${_CP0_SDK_ARCHIVE}\n"
+            "Expected ${CM0_SDK_SHA256}, got ${_CP0_CACHED_SDK_SHA256}."
+        )
+    endif()
+endif()
 
 # CMAKE_SYSROOT must exist before project() runs, otherwise CMake's compiler ABI
 # checks fail before the main CMakeLists.txt has a chance to download anything.
@@ -33,8 +45,6 @@ if(NOT EXISTS "${CM0_SDK_ROOT}")
     file(MAKE_DIRECTORY "${_CP0_CACHE_DIR}")
     get_filename_component(_CP0_SYSROOT_PARENT "${CM0_SDK_ROOT}" DIRECTORY)
     file(MAKE_DIRECTORY "${_CP0_SYSROOT_PARENT}")
-    set(_CP0_SDK_ARCHIVE "${_CP0_CACHE_DIR}/sdk_bsp.tar.gz")
-
     message(STATUS "CM0 SDK sysroot missing, downloading BSP: ${CM0_SDK_URL}")
     file(DOWNLOAD
         "${CM0_SDK_URL}"
@@ -42,6 +52,7 @@ if(NOT EXISTS "${CM0_SDK_ROOT}")
         SHOW_PROGRESS
         STATUS _CP0_DOWNLOAD_STATUS
         TIMEOUT 300
+        EXPECTED_HASH "SHA256=${CM0_SDK_SHA256}"
     )
     list(GET _CP0_DOWNLOAD_STATUS 0 _CP0_DOWNLOAD_CODE)
     list(GET _CP0_DOWNLOAD_STATUS 1 _CP0_DOWNLOAD_MESSAGE)

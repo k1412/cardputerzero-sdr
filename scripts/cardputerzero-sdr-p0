@@ -167,13 +167,17 @@ done
         preflight_ok=0
     fi
 
-    framebuffer="$dev_root/fb0"
+    framebuffer=${LV_LINUX_FBDEV_DEVICE:-${APPLAUNCH_LINUX_FBDEV_DEVICE:-$dev_root/fb0}}
+    framebuffer_name=${framebuffer##*/}
+    framebuffer_sys="$sys_root/class/graphics/$framebuffer_name"
     echo "framebuffer=$framebuffer access=$(access_text "$framebuffer") mode=$(mode_text "$framebuffer")"
     [ -r "$framebuffer" ] && [ -w "$framebuffer" ] || preflight_ok=0
-    framebuffer_virtual_size=$(read_trimmed "$sys_root/class/graphics/fb0/virtual_size")
+    framebuffer_index=${framebuffer_name#fb}
+    [ "$framebuffer_index" != "$framebuffer_name" ] && is_uint "$framebuffer_index" || preflight_ok=0
+    framebuffer_virtual_size=$(read_trimmed "$framebuffer_sys/virtual_size")
     [ "$framebuffer_virtual_size" = "320,170" ] || preflight_ok=0
     for attribute in name virtual_size bits_per_pixel; do
-        value=$(read_trimmed "$sys_root/class/graphics/fb0/$attribute")
+        value=$(read_trimmed "$framebuffer_sys/$attribute")
         [ -z "$value" ] || echo "framebuffer_$attribute=$value"
     done
 

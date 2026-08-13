@@ -707,7 +707,6 @@ target_compile_definitions(${PROJECT_NAME}_core
         APP_CONFIG_FILE="${APP_CONFIG_FILE}"
         APP_CMAKE_ASSETS_ROOT="${APP_ASSETS_ROOT}"
         APP_SOURCE_ASSETS_ROOT="${CMAKE_CURRENT_SOURCE_DIR}/assets"
-        APP_FRAMEBUFFER_DEVICE="${APP_FRAMEBUFFER_DEVICE}"
         APP_DRM_DEVICE="${APP_DRM_DEVICE}"
         APP_DRM_CONNECTOR_ID=${APP_DRM_CONNECTOR_ID}
 )
@@ -760,6 +759,13 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     add_executable(input_policy_test tests/input_policy_test.cpp)
     target_include_directories(input_policy_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/platform")
     add_test(NAME input_policy COMMAND input_policy_test)
+
+    add_executable(display_device_test
+        tests/display_device_test.cpp
+        src/platform/display_device.cpp
+    )
+    target_include_directories(display_device_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/platform")
+    add_test(NAME display_device COMMAND display_device_test)
 
     add_executable(synthetic_spectrum_test tests/synthetic_spectrum_test.cpp)
     target_link_libraries(synthetic_spectrum_test PRIVATE ${PROJECT_NAME}_model)
