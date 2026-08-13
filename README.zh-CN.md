@@ -57,7 +57,7 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 | `0`–`9`、`.` | 打开 MHz 直接输入 | — |
 | 退格 | 删除直接输入的字符 | — |
 
-底栏始终显示主要操作提示。Z/C 连续调谐和设置页 F/X 移动支持受控长按；步进、切换、确认和直接输入每次按下只执行一次。项目刻意避免破坏性操作和隐藏组合键。
+底栏始终显示主要操作提示。Z/C 连续调谐和设置页 F/X 移动支持受控长按；实体 TCA8418 键盘的设备树没有启用内核自动重复，因此应用会在用户态采用与 APPLaunch 一致的 500 毫秒起始延迟和 50 毫秒重复周期。步进、切换、确认和直接输入每次按下只执行一次。项目刻意避免破坏性操作和隐藏组合键。
 
 在设置页的增益行中，左/右键会循环 `自动` 和当前调谐器实际报告的增益档位。目标 FC0012 提供 −9.9、−4.0、7.1、17.9 和 19.2 dB；其他 RTL-SDR 调谐器使用各自上报的列表。`G` 仍是一键切换自动/手动增益的快捷键。
 
@@ -95,7 +95,7 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 
 应用默认每 30 秒向标准输出写入一条结构化 `diagnostics` 记录，其中包含累计连接/重试/读取错误、IQ 数据块与字节数、音频生成/写入/丢帧、ALSA 恢复与故障、DSP 处理耗时、界面循环次数和最大界面循环间隔。需要调整周期时，可将 `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` 设置为 100–3,600,000 毫秒。
 
-ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设备预检与证据采集工具。运行时不要同时从 APPLaunch 启动第二个 Zero SDR 实例。先通过 SSH 或本地终端，以正常 APPLaunch 用户检查帧缓冲、键盘、RTL-SDR USB 节点和 ALSA 权限：
+ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设备预检与证据采集工具。运行时不要同时从 APPLaunch 启动第二个 Zero SDR 实例。先通过 SSH 或本地终端，以正常 APPLaunch 用户检查原生 320×170 帧缓冲、官方 APPLaunch/Cardputer 键盘路径、RTL-SDR USB 节点和可写 ALSA 播放节点：
 
 ```sh
 cardputerzero-sdr-p0 --preflight-only

@@ -170,10 +170,16 @@ done
     framebuffer="$dev_root/fb0"
     echo "framebuffer=$framebuffer access=$(access_text "$framebuffer") mode=$(mode_text "$framebuffer")"
     [ -r "$framebuffer" ] && [ -w "$framebuffer" ] || preflight_ok=0
+    framebuffer_virtual_size=$(read_trimmed "$sys_root/class/graphics/fb0/virtual_size")
+    [ "$framebuffer_virtual_size" = "320,170" ] || preflight_ok=0
     for attribute in name virtual_size bits_per_pixel; do
         value=$(read_trimmed "$sys_root/class/graphics/fb0/$attribute")
         [ -z "$value" ] || echo "framebuffer_$attribute=$value"
     done
+
+    preferred_keyboard=${LV_LINUX_KEYBOARD_DEVICE:-${APPLAUNCH_LINUX_KEYBOARD_DEVICE:-$dev_root/input/by-path/platform-3f804000.i2c-event}}
+    echo "preferred_keyboard=$preferred_keyboard access=$(access_text "$preferred_keyboard") mode=$(mode_text "$preferred_keyboard")"
+    [ -r "$preferred_keyboard" ] || preflight_ok=0
 
     input_count=0
     input_readable=0
@@ -224,6 +230,17 @@ done
         echo "alsa_cards=missing"
         preflight_ok=0
     fi
+    alsa_playback_nodes=0
+    alsa_accessible_nodes=0
+    for pcm_path in "$dev_root"/snd/pcm*p; do
+        [ -e "$pcm_path" ] || continue
+        echo "alsa_playback_node=${pcm_path##*/} access=$(access_text "$pcm_path") mode=$(mode_text "$pcm_path")"
+        alsa_playback_nodes=$((alsa_playback_nodes + 1))
+        [ -r "$pcm_path" ] && [ -w "$pcm_path" ] &&
+            alsa_accessible_nodes=$((alsa_accessible_nodes + 1))
+    done
+    echo "alsa_playback_nodes=$alsa_playback_nodes accessible=$alsa_accessible_nodes"
+    [ "$alsa_accessible_nodes" -gt 0 ] || preflight_ok=0
     if [ -r "$proc_root/asound/pcm" ]; then
         sed -n '1,20{s/^/alsa_pcm: /; p;}' "$proc_root/asound/pcm"
     fi

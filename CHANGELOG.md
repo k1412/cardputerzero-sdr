@@ -25,6 +25,8 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Muted/unavailable-audio WFM bypass to preserve device CPU budget without stopping RF visualization
 - Non-root Cardputer Zero P0 preflight/resource collector with privacy-filtered release evidence
 - Graceful `SIGINT`/`SIGTERM` shutdown through the normal receiver and audio cleanup path
+- APPLaunch-aware Cardputer keyboard discovery with strict full-control capability matching and single-device fallback
+- APPLaunch-matched 500/50 ms userspace key repeat for the non-autorepeating TCA8418 driver
 
 ### Known limitations
 

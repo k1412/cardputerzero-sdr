@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 
 #if !USE_DESKTOP
@@ -16,6 +17,11 @@
 
 #ifndef APP_KEY_INPUT_DEVICE
 #define APP_KEY_INPUT_DEVICE ""
+#endif
+
+#ifndef APP_CARDPUTER_KEY_INPUT_DEVICE
+// Stable TCA8418 path used by the official Cardputer Zero APPLaunch runtime.
+#define APP_CARDPUTER_KEY_INPUT_DEVICE "/dev/input/by-path/platform-3f804000.i2c-event"
 #endif
 
 namespace platform {
@@ -37,6 +43,8 @@ struct EvdevKeypad {
     uint32_t router_key{0};
     bool router_pressed{false};
     bool router_repeated{false};
+    bool synthesize_repeat{true};
+    AppKeyRepeatState repeat{};
 };
 #endif
 
@@ -261,7 +269,15 @@ uint32_t map_evdev_key(uint16_t code) {
     }
 }
 
-bool has_nav_keys(int fd) {
+bool has_app_keys(int fd, bool& kernel_repeat_enabled) {
+    unsigned long event_bits[(EV_MAX / (sizeof(unsigned long) * 8)) + 1] = {};
+    kernel_repeat_enabled = false;
+    if (ioctl(fd, EVIOCGBIT(0, sizeof(event_bits)), event_bits) >= 0) {
+        const auto bits_per_word = static_cast<int>(sizeof(unsigned long) * 8);
+        kernel_repeat_enabled =
+            (event_bits[EV_REP / bits_per_word] & (1UL << (EV_REP % bits_per_word))) != 0;
+    }
+
     unsigned long key_bits[(KEY_MAX / (sizeof(unsigned long) * 8)) + 1] = {};
     if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(key_bits)), key_bits) < 0) {
         return false;
@@ -272,11 +288,28 @@ bool has_nav_keys(int fd) {
         return (key_bits[code / bits_per_word] & (1UL << (code % bits_per_word))) != 0;
     };
 
-    return has_key(KEY_ESC) || has_key(KEY_LEFT) || has_key(KEY_RIGHT) || has_key(KEY_UP) ||
-           has_key(KEY_DOWN) || has_key(KEY_ENTER) || has_key(KEY_F) || has_key(KEY_X) ||
-           has_key(KEY_Z) || has_key(KEY_C) || has_key(KEY_G) || has_key(KEY_M) ||
-           has_key(KEY_L) || has_key(KEY_T) || has_key(KEY_4) || has_key(KEY_5) || has_key(KEY_6) ||
-           has_key(KEY_7) || has_key(KEY_8);
+    uint32_t capabilities = 0;
+    const bool directional_keys =
+        (has_key(KEY_F) && has_key(KEY_X) && has_key(KEY_Z) && has_key(KEY_C)) ||
+        (has_key(KEY_UP) && has_key(KEY_DOWN) && has_key(KEY_LEFT) && has_key(KEY_RIGHT));
+    if (directional_keys) {
+        capabilities |= app_keyboard_capability(AppKeyboardCapability::Navigation);
+    }
+    if (has_key(KEY_ENTER) && has_key(KEY_ESC)) {
+        capabilities |= app_keyboard_capability(AppKeyboardCapability::ConfirmAndBack);
+    }
+    if (has_key(KEY_G) && has_key(KEY_M) && has_key(KEY_L) && has_key(KEY_T)) {
+        capabilities |= app_keyboard_capability(AppKeyboardCapability::RadioShortcuts);
+    }
+    const bool number_row = has_key(KEY_0) && has_key(KEY_1) && has_key(KEY_2) &&
+                            has_key(KEY_3) && has_key(KEY_4) && has_key(KEY_5) &&
+                            has_key(KEY_6) && has_key(KEY_7) && has_key(KEY_8) &&
+                            has_key(KEY_9);
+    if (number_row && (has_key(KEY_DOT) || has_key(KEY_KPDOT)) &&
+        (has_key(KEY_BACKSPACE) || has_key(KEY_DELETE))) {
+        capabilities |= app_keyboard_capability(AppKeyboardCapability::DirectEntry);
+    }
+    return supports_zero_sdr_controls(capabilities);
 }
 
 void evdev_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
@@ -287,6 +320,7 @@ void evdev_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
         return;
     }
 
+    bool physical_event = false;
     input_event input{};
     while (read(keypad->fd, &input, sizeof(input)) == sizeof(input)) {
         if (input.type != EV_KEY) {
@@ -304,8 +338,30 @@ void evdev_read_cb(lv_indev_t* indev, lv_indev_data_t* data) {
         keypad->router_key = key;
         keypad->router_pressed = keypad->state == LV_INDEV_STATE_PRESSED;
         keypad->router_repeated = input.value == 2;
+        const uint32_t now = lv_tick_get();
+        if (input.value == 0) {
+            keypad->repeat.release(key);
+        } else if (input.value == 1 && keypad->synthesize_repeat) {
+            keypad->repeat.press(key, now);
+        } else if (input.value == 2 && keypad->synthesize_repeat) {
+            keypad->repeat.observed_repeat(key, now);
+        }
+        physical_event = true;
         data->continue_reading = true;
         break;
+    }
+
+    if (!physical_event && keypad->repeat.armed) {
+        const uint32_t now = lv_tick_get();
+        if (keypad->repeat.due(now)) {
+            keypad->key = keypad->repeat.key;
+            keypad->state = LV_INDEV_STATE_PRESSED;
+            keypad->router_event_pending = true;
+            keypad->router_key = keypad->repeat.key;
+            keypad->router_pressed = true;
+            keypad->router_repeated = true;
+            keypad->repeat.emitted(now);
+        }
     }
 
     data->key = keypad->key;
@@ -325,9 +381,10 @@ void evdev_delete_cb(lv_event_t* event) {
     delete keypad;
 }
 
-lv_indev_t* create_keypad_from_fd(int fd) {
+lv_indev_t* create_keypad_from_fd(int fd, bool kernel_repeat_enabled) {
     auto* keypad = new EvdevKeypad;
     keypad->fd = fd;
+    keypad->synthesize_repeat = !kernel_repeat_enabled;
 
     auto* indev = lv_indev_create();
     if (!indev) {
@@ -355,13 +412,15 @@ lv_indev_t* try_create_keypad(const char* path) {
         return nullptr;
     }
 
-    if (!has_nav_keys(fd)) {
+    bool kernel_repeat_enabled = false;
+    if (!has_app_keys(fd, kernel_repeat_enabled)) {
         close(fd);
         return nullptr;
     }
 
-    LV_LOG_INFO("using evdev key input %s", path);
-    return create_keypad_from_fd(fd);
+    LV_LOG_INFO("using evdev key input %s (%s repeat)", path,
+                kernel_repeat_enabled ? "kernel" : "userspace");
+    return create_keypad_from_fd(fd, kernel_repeat_enabled);
 }
 
 void discover_keypads(lv_display_t* display) {
@@ -372,6 +431,30 @@ void discover_keypads(lv_display_t* display) {
             lv_indev_set_display(indev, display);
         }
         return;
+    }
+
+    const std::array<const char*, 3> preferred_devices = {{
+        std::getenv("LV_LINUX_KEYBOARD_DEVICE"),
+        std::getenv("APPLAUNCH_LINUX_KEYBOARD_DEVICE"),
+        APP_CARDPUTER_KEY_INPUT_DEVICE,
+    }};
+    for (size_t index = 0; index < preferred_devices.size(); ++index) {
+        const char* preferred_device = preferred_devices[index];
+        if (!preferred_device || preferred_device[0] == '\0') continue;
+        bool already_tried = false;
+        for (size_t earlier = 0; earlier < index; ++earlier) {
+            const char* earlier_device = preferred_devices[earlier];
+            if (earlier_device && std::strcmp(preferred_device, earlier_device) == 0) {
+                already_tried = true;
+                break;
+            }
+        }
+        if (already_tried) continue;
+        auto* indev = try_create_keypad(preferred_device);
+        if (indev) {
+            lv_indev_set_display(indev, display);
+            return;
+        }
     }
 
     auto* dir = opendir("/dev/input");
@@ -390,6 +473,8 @@ void discover_keypads(lv_display_t* display) {
         auto* indev = try_create_keypad(path.c_str());
         if (indev) {
             lv_indev_set_display(indev, display);
+            closedir(dir);
+            return;
         }
     }
 

@@ -22,6 +22,7 @@ set(APP_NAME "${PROJECT_NAME}" CACHE STRING "Application name used for installed
 set(APP_ASSETS_ROOT "" CACHE PATH "Optional runtime assets root. Expected subdirectories include fonts/")
 set(APP_CONFIG_FILE "" CACHE FILEPATH "Application config file; defaults to the repository file on desktop and /etc/cardputerzero-sdr.conf on device")
 set(APP_KEY_INPUT_DEVICE "" CACHE STRING "Optional Linux evdev keyboard/keypad device path, e.g. /dev/input/event0")
+set(APP_CARDPUTER_KEY_INPUT_DEVICE "/dev/input/by-path/platform-3f804000.i2c-event" CACHE STRING "Stable Cardputer Zero keyboard path used before evdev scanning")
 set(APP_FRAMEBUFFER_DEVICE "/dev/fb0" CACHE STRING "Linux framebuffer device path used by embedded builds")
 set(APP_DRM_DEVICE "/dev/dri/card0" CACHE STRING "Linux DRM device path used when APP_USE_DRM=ON")
 set(APP_DRM_CONNECTOR_ID "-1" CACHE STRING "DRM connector id used when APP_USE_DRM=ON; -1 auto-selects")
@@ -495,6 +496,7 @@ target_include_directories(${PROJECT_NAME}_platform
 target_compile_definitions(${PROJECT_NAME}_platform
     PUBLIC
         APP_KEY_INPUT_DEVICE="${APP_KEY_INPUT_DEVICE}"
+        APP_CARDPUTER_KEY_INPUT_DEVICE="${APP_CARDPUTER_KEY_INPUT_DEVICE}"
         APP_FRAMEBUFFER_DEVICE="${APP_FRAMEBUFFER_DEVICE}"
         APP_DRM_DEVICE="${APP_DRM_DEVICE}"
         APP_DRM_CONNECTOR_ID=${APP_DRM_CONNECTOR_ID}

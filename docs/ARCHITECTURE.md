@@ -61,6 +61,7 @@ The application converts `SIGINT` and `SIGTERM` into a main-loop stop request, t
 - The waterfall stores only the visible 316×19 RGB565 pixels.
 - The desktop LVGL software renderer is intentionally single-worker because concurrent FreeType access was unstable with CJK font rasterization.
 - Device builds must be profiled before increasing FFT size or frame rate.
+- Device input prefers APPLaunch's `LV_LINUX_KEYBOARD_DEVICE`/`APPLAUNCH_LINUX_KEYBOARD_DEVICE`, then the official stable TCA8418 by-path node, and only then scans for one evdev device that exposes every Zero SDR control group. This avoids binding unrelated or duplicate event nodes. Because the Cardputer TCA8418 device tree does not enable kernel `EV_REP`, the adapter synthesizes the same 500 ms delay/50 ms repeat cadence as APPLaunch; screen-level policy still accepts repeats only for continuous tuning and settings-row movement.
 
 ## Dependency policy
 

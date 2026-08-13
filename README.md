@@ -57,7 +57,7 @@ Mutable settings are stored under `$XDG_CONFIG_HOME/cardputerzero-sdr/` or `~/.c
 | `0`–`9`, `.` | Open direct MHz entry | — |
 | Backspace | Delete direct-entry character | — |
 
-The bottom bar always shows the primary actions. Z/C frequency tuning and F/X settings-row movement support controlled key repeat; step changes, toggles, confirmation, and direct entry execute once per press. Destructive or hidden key chords are intentionally absent.
+The bottom bar always shows the primary actions. Z/C frequency tuning and F/X settings-row movement support controlled key repeat; on the physical TCA8418 keyboard the app matches APPLaunch's 500 ms delay and 50 ms cadence in userspace because the device tree does not enable kernel autorepeat. Step changes, toggles, confirmation, and direct entry execute once per press. Destructive or hidden key chords are intentionally absent.
 
 On the Settings gain row, Left/Right cycles `AUTO` and the exact gain values reported by the connected tuner. The FC0012 target exposes −9.9, −4.0, 7.1, 17.9, and 19.2 dB; other RTL-SDR tuners use their own reported list. `G` remains a one-press auto/manual shortcut.
 
@@ -95,7 +95,7 @@ Generate six reproducible receiver states—offline demo, fake-device `LIVE`, de
 
 The app writes one structured `diagnostics` record to standard output every 30 seconds. Each record contains cumulative connection/retry/read-error counts, IQ blocks and bytes, audio generated/written/dropped frames, ALSA recovery/failure counts, DSP processing time, UI-loop count, and maximum UI-loop gap. Set `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` to a value from 100 to 3,600,000 when a different interval is needed.
 
-The ARM64 package installs `cardputerzero-sdr-p0`, a non-root preflight and evidence runner. Do not launch a second Zero SDR instance from APPLaunch at the same time. From an SSH or local shell as the normal APPLaunch user, first verify framebuffer, keyboard, RTL-SDR USB-node, and ALSA access:
+The ARM64 package installs `cardputerzero-sdr-p0`, a non-root preflight and evidence runner. Do not launch a second Zero SDR instance from APPLaunch at the same time. From an SSH or local shell as the normal APPLaunch user, first verify native 320×170 framebuffer access, the official APPLaunch/Cardputer keyboard path, RTL-SDR USB-node access, and a writable ALSA playback node:
 
 ```sh
 cardputerzero-sdr-p0 --preflight-only
