@@ -15,6 +15,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 - CardputerZero Store manifest, icon, screenshots, and release gates
 - Runtime-loaded RTL-SDR device session with reconnect, live IQ spectrum, channel-filtered/DC-blocked WFM mono demodulation, and bounded ALSA output
 - Atomic persistence for frequency, tuning step, gain, mute, theme, and language with strict range validation
+- Narrow udev permissions for Realtek RTL2832U `0bda:2832/2838` without a root service
 
 ### Known limitations
 

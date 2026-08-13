@@ -58,4 +58,4 @@ The receiver worker must never call LVGL. It publishes bounded frames to the mai
 
 ## Dependency policy
 
-LVGL is pinned to 9.5.0. Fetched libraries use immutable release tags. RTL-SDR and ALSA use runtime discovery so the app still opens cleanly when a dongle or audio route is absent. Cardputer packages bundle pinned librtlsdr 2.0.3 privately and use the BSP's declared libusb and ALSA runtimes.
+LVGL is pinned to 9.5.0. Fetched libraries use immutable release tags or hashed release archives. RTL-SDR and ALSA use runtime discovery so the app still opens cleanly when a dongle or audio route is absent. Cardputer packages bundle pinned librtlsdr 2.0.3 privately and use the BSP's declared libusb and ALSA runtimes. A narrow udev rule covers only Realtek `0bda:2832/2838`, matching Debian's `plugdev` convention while adding active-seat `uaccess`; it does not run the app as root.

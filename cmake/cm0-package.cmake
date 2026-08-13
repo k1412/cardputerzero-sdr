@@ -36,6 +36,9 @@ install(TARGETS ${PROJECT_NAME}
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/config/cardputerzero-sdr.conf"
     DESTINATION "/etc"
 )
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/packaging/60-cardputerzero-sdr-rtlsdr.rules"
+    DESTINATION "/lib/udev/rules.d"
+)
 
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/"
     DESTINATION "${CMAKE_INSTALL_DATADIR}/${APP_NAME}/fonts"
@@ -112,6 +115,21 @@ configure_file(
     "${APP_GENERATED_DIR}/conffiles"
     @ONLY
 )
-set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA "${APP_GENERATED_DIR}/conffiles")
+configure_file(
+    "${CMAKE_CURRENT_LIST_DIR}/templates/postinst.in"
+    "${APP_GENERATED_DIR}/postinst"
+    @ONLY
+)
+configure_file(
+    "${CMAKE_CURRENT_LIST_DIR}/templates/postrm.in"
+    "${APP_GENERATED_DIR}/postrm"
+    @ONLY
+)
+file(CHMOD "${APP_GENERATED_DIR}/postinst" "${APP_GENERATED_DIR}/postrm"
+    PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+)
+set(CPACK_DEBIAN_PACKAGE_CONTROL_EXTRA
+    "${APP_GENERATED_DIR}/conffiles;${APP_GENERATED_DIR}/postinst;${APP_GENERATED_DIR}/postrm"
+)
 
 include(CPack)

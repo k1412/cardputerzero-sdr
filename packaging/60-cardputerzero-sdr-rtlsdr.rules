@@ -1,0 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Target the Realtek reference IDs supported by Zero SDR. The group matches
+# Debian's librtlsdr0 policy; uaccess also supports active-seat ACLs.
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTR{idProduct}=="2832", ENV{ID_SOFTWARE_RADIO}="1", MODE="0660", GROUP="plugdev", TAG+="uaccess"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0bda", ATTR{idProduct}=="2838", ENV{ID_SOFTWARE_RADIO}="1", MODE="0660", GROUP="plugdev", TAG+="uaccess"

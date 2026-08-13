@@ -25,6 +25,7 @@ Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. 
 - Last-used frequency, tuning step, gain, mute, theme, and language persist across launches
 - Runtime-loaded RTL-SDR capture, channel-filtered WFM audio, and automatic reconnect
 - Audited ARM64 Debian package with a private pinned librtlsdr runtime
+- Narrow `plugdev`/`uaccess` rules for the tested Realtek RTL2832U USB IDs; no root service
 - Ten UI languages: English, Simplified Chinese, Traditional Chinese, Spanish, Japanese, Korean, French, German, Brazilian Portuguese, and Russian
 - Linux/macOS/Windows desktop simulator support inherited from the official CardputerZero template
 - Host tests for tuning, FFT/WFM DSP, runtime-loaded RTL-SDR and ALSA boundaries, reconnect behavior, settings persistence, and translation completeness
@@ -114,7 +115,7 @@ See [Architecture](docs/ARCHITECTURE.md), [UX and controls](docs/UX.md), [Intern
 
 ## Store release policy
 
-`app-builder.json` is prepared for the CardputerZero tooling, and all referenced screenshots are native 320×170 PNGs. Publication is held until the P0 hardware checks pass. The app does not install a root system service and does not require network or cloud access.
+`app-builder.json` is prepared for the CardputerZero tooling, and all referenced screenshots are native 320×170 PNGs. Publication is held until the P0 hardware checks pass. The app does not install a root system service and does not require network or cloud access. Its udev rules grant only the tested Realtek `0bda:2832` and `0bda:2838` IDs to Debian's `plugdev` group/active-seat ACL; real-device permission behavior remains a P0 check.
 
 The package name is `cardputerzero-sdr`. An existing Store app named `zerosdr` is a separate project; this repository does not claim compatibility or ownership of it.
 
