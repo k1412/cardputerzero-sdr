@@ -83,6 +83,8 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 
 Run the radio, settings, and direct-tuning states in all ten locales with `scripts/smoke_locales.sh`. To capture only the direct-tuning overlay, start on the radio page and set `ZERO_SDR_DIRECT_ENTRY=103.9`.
 
+Generate reproducible offline demo, fake-device `LIVE`, direct-tuning, and `NO DEVICE` evidence with `scripts/capture_demo_states.sh`.
+
 ## Cardputer Zero build
 
 The cross preset follows the official CardputerZero CMake template and downloads its pinned BSP into `.cache/` when needed. An AArch64 cross compiler must be available.

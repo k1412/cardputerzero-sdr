@@ -50,6 +50,9 @@ jobs:
       - name: Smoke-test all locales
         run: scripts/smoke_locales.sh ./build/linux-x86-64/Debug/cardputerzero-sdr locale-smoke
 
+      - name: Capture demo and device states
+        run: scripts/capture_demo_states.sh ./build/linux-x86-64/Debug/cardputerzero-sdr demo-states
+
       - name: Upload locale screenshots
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -58,3 +61,12 @@ jobs:
           path: locale-smoke/*.png
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Upload demo-state screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: demo-states-${{ github.run_id }}
+          path: demo-states/*
+          if-no-files-found: warn
+          retention-days: 14
