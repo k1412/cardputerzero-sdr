@@ -25,9 +25,9 @@ This establishes the dongle baseline only. It does not prove Cardputer Zero USB-
 | USB discovery | Cold boot, hot-plug, unplug/replug RTL2832U | state changes without crash; UI stays responsive | Pending device |
 | USB power | Capture continuously with screen/audio active | no brownout, disconnect loop, or thermal warning | Pending device |
 | Tuning | Test 22.0, 97.4, and 948.6 MHz by stepping and direct entry; try 21.999/948.601 | valid values tune exactly; invalid values are rejected; no overflow/wrap | Pending device |
-| RF capture | Run 2.048 MS/s for 30 minutes | no sustained overruns; reconnect path works | Pending device |
+| RF capture | Run 2.048 MS/s for 30 minutes and summarize the structured log | no read errors/reconnects; IQ throughput within 10% of 4,096,000 bytes/s | Pending device |
 | WFM audio | Receive a known station, mute/unmute, unplug device | intelligible audio; no loud transient; mute is immediate | Pending device |
-| Performance | Record CPU, memory, UI frame cadence, audio underruns | thresholds documented from real measurements | Pending device |
+| Performance | Record process CPU/memory plus diagnostic DSP/UI metrics | average DSP work below 4,000 µs/block; physical UI/max-latency baseline documented | Pending device |
 | Locales | Open radio/settings in all ten languages | glyphs render; no clipping or crash | Pending device |
 | Persistence | Change frequency/step/gain/mute/theme/language, restart app | all survive and app can recover from malformed config | Pending device |
 
@@ -41,11 +41,37 @@ This establishes the dongle baseline only. It does not prove Cardputer Zero USB-
 - Force the SDR worker behind real time and verify bounded frame dropping.
 - Stop audio output and verify the receiver/UI can shut down cleanly.
 
+## 30-minute continuous-capture evidence
+
+Run this separately from hot-plug and failure-injection tests so intentional reconnects do not contaminate the continuous-run counters. Keep audio unmuted on a known WFM station, capture the app's standard output, and retain the complete log:
+
+```sh
+ZERO_SDR_DIAGNOSTICS_INTERVAL_MS=30000 cardputerzero-sdr \
+  2>&1 | tee zero-sdr-30m.log
+```
+
+Copy the log into a repository checkout on the development machine, then run:
+
+```sh
+python3 scripts/summarize_diagnostics.py --p0 zero-sdr-30m.log
+```
+
+The expected RF input is 2.048 million complex samples/s at two unsigned bytes per sample, or 4,096,000 bytes/s. A 16,384-byte input block represents 8,192 complex samples and 4,000 µs of RF time, so average spectrum plus demodulation work must stay below 4,000 µs/block. Unmuted WFM output should approach 32,000 mono frames/s. The automated P0 evaluation requires:
+
+- `uptime_ms` of at least 1,800,000;
+- one connection attempt, one successful connection, and no retry wait;
+- zero read errors and IQ byte rate within ±10% of 4,096,000 bytes/s;
+- zero audio drops, recoveries, write errors, or open failures;
+- unmuted audio write rate within ±10% of 32,000 frames/s;
+- average processing time below 4,000 µs per IQ block.
+
+Retain `max_processing_us` and `max_ui_gap_ms` in the evidence. They expose scheduler spikes and UI stalls, but their final release thresholds must be derived from the physical Cardputer Zero run rather than a desktop simulator. Record process CPU and resident memory alongside these internal metrics because the app intentionally does not guess platform-wide resource figures.
+
 ## Evidence to attach to a release
 
 - Device model/OS image and kernel version
 - Dongle tuner/USB ID and whether external power was used
 - `.deb` checksum
-- 30-minute capture log and resource measurements
+- 30-minute capture log, `summarize_diagnostics.py --p0` output, and resource measurements
 - Photos or native screenshots of both pages
 - Completed table above with issue links for any waiver

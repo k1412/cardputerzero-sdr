@@ -34,6 +34,7 @@ RadioSession::~RadioSession() {
 void RadioSession::start() {
     bool expected = false;
     if (!running_.compare_exchange_strong(expected, true)) return;
+    reset_metrics();
     set_state(RadioSessionState::Connecting);
     worker_ = std::thread(&RadioSession::worker_main, this);
 }
@@ -94,6 +95,26 @@ bool RadioSession::audio_active() const {
     return audio_active_.load();
 }
 
+RadioSessionMetrics RadioSession::metrics() const {
+    return {
+        metric_connection_attempts_.load(),
+        metric_successful_connections_.load(),
+        metric_retry_waits_.load(),
+        metric_read_errors_.load(),
+        metric_settings_updates_.load(),
+        metric_iq_blocks_.load(),
+        metric_iq_bytes_.load(),
+        metric_audio_frames_generated_.load(),
+        metric_audio_frames_written_.load(),
+        metric_audio_frames_dropped_.load(),
+        metric_audio_recoveries_.load(),
+        metric_audio_write_errors_.load(),
+        metric_audio_open_failures_.load(),
+        metric_total_processing_us_.load(),
+        metric_maximum_processing_us_.load(),
+    };
+}
+
 void RadioSession::worker_main() {
     RtlSdrDevice radio(library_path_);
     dsp::IqSpectrum spectrum;
@@ -102,6 +123,7 @@ void RadioSession::worker_main() {
     std::array<uint8_t, kReadBufferBytes> iq_buffer{};
 
     while (running_.load()) {
+        metric_connection_attempts_.fetch_add(1);
         set_state(RadioSessionState::Connecting);
         if (!radio.library_available()) {
             set_state(RadioSessionState::Missing, radio.library_error());
@@ -139,17 +161,33 @@ void RadioSession::worker_main() {
             std::lock_guard<std::mutex> lock(data_mutex_);
             supported_gains_ = tuner_gains;
         }
+        metric_successful_connections_.fetch_add(1);
 
         uint64_t applied_generation = settings_generation_.load();
+        const uint64_t audio_written_base = metric_audio_frames_written_.load();
+        const uint64_t audio_dropped_base = metric_audio_frames_dropped_.load();
+        const uint64_t audio_recoveries_base = metric_audio_recoveries_.load();
+        const uint64_t audio_write_errors_base = metric_audio_write_errors_.load();
         std::string audio_error;
-        audio_active_.store(audio_sink.open(audio_device_name_,
-                                            dsp::WfmDemodulator::kAudioSampleRateHz,
-                                            audio_error));
+        const bool audio_opened = audio_sink.open(audio_device_name_,
+                                                  dsp::WfmDemodulator::kAudioSampleRateHz,
+                                                  audio_error);
+        audio_active_.store(audio_opened);
+        if (!audio_opened) metric_audio_open_failures_.fetch_add(1);
+        const auto publish_audio_metrics = [&] {
+            if (!audio_opened) return;
+            metric_audio_frames_written_.store(audio_written_base + audio_sink.frames_written());
+            metric_audio_frames_dropped_.store(audio_dropped_base + audio_sink.dropped_frames());
+            metric_audio_recoveries_.store(audio_recoveries_base + audio_sink.recoveries());
+            metric_audio_write_errors_.store(audio_write_errors_base + audio_sink.write_errors());
+        };
         audio_sink.set_muted(requested_muted_.load());
         demodulator.reset();
+        bool demodulation_active = false;
         set_state(RadioSessionState::Live, audio_error, available_devices.front().name);
         while (running_.load() && radio.is_open()) {
-            audio_sink.set_muted(requested_muted_.load());
+            const bool muted = requested_muted_.load();
+            audio_sink.set_muted(muted);
             const uint64_t requested_generation = settings_generation_.load();
             if (requested_generation != applied_generation) {
                 if (!radio.set_center_frequency(requested_frequency_hz_.load(), error) ||
@@ -162,34 +200,52 @@ void RadioSession::worker_main() {
                 }
                 demodulator.reset();
                 applied_generation = requested_generation;
+                metric_settings_updates_.fetch_add(1);
             }
 
             size_t bytes_read = 0;
             if (!radio.read_sync(iq_buffer.data(), iq_buffer.size(), bytes_read, error) ||
                 bytes_read < dsp::kSpectrumBinCount * 2) {
+                metric_read_errors_.fetch_add(1);
                 set_state(RadioSessionState::Error,
                           error.empty() ? "RTL-SDR returned a short IQ block" : error,
                           available_devices.front().name);
                 break;
             }
 
+            metric_iq_blocks_.fetch_add(1);
+            metric_iq_bytes_.fetch_add(bytes_read);
+            const auto processing_started = std::chrono::steady_clock::now();
             auto frame = spectrum.process(iq_buffer.data(), bytes_read);
-            const auto audio = demodulator.process(iq_buffer.data(), bytes_read);
-            if (audio_active_.load() && !audio.empty()) {
-                if (!audio_sink.submit(audio.data(), audio.size())) {
+            const bool should_demodulate = audio_active_.load() && !muted;
+            if (should_demodulate) {
+                if (!demodulation_active) demodulator.reset();
+                demodulation_active = true;
+                const auto audio = demodulator.process(iq_buffer.data(), bytes_read);
+                metric_audio_frames_generated_.fetch_add(audio.size());
+                if (!audio.empty() && !audio_sink.submit(audio.data(), audio.size())) {
                     audio_active_.store(false);
+                    demodulation_active = false;
                     set_state(RadioSessionState::Live,
                               "ALSA audio output stopped after an unrecoverable write error",
                               available_devices.front().name);
                 }
             }
+            else {
+                demodulation_active = false;
+            }
             {
                 std::lock_guard<std::mutex> lock(data_mutex_);
                 latest_frame_ = frame;
             }
+            publish_audio_metrics();
+            const auto processing_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - processing_started).count();
+            record_processing_time(static_cast<uint64_t>(processing_us));
             std::this_thread::yield();
         }
         audio_sink.close();
+        publish_audio_metrics();
         audio_active_.store(false);
         radio.close();
         if (running_.load() && wait_for_retry()) break;
@@ -199,8 +255,35 @@ void RadioSession::worker_main() {
 }
 
 bool RadioSession::wait_for_retry() {
+    metric_retry_waits_.fetch_add(1);
     std::unique_lock<std::mutex> lock(data_mutex_);
     return stop_condition_.wait_for(lock, kReconnectDelay, [this] { return !running_.load(); });
+}
+
+void RadioSession::reset_metrics() {
+    metric_connection_attempts_.store(0);
+    metric_successful_connections_.store(0);
+    metric_retry_waits_.store(0);
+    metric_read_errors_.store(0);
+    metric_settings_updates_.store(0);
+    metric_iq_blocks_.store(0);
+    metric_iq_bytes_.store(0);
+    metric_audio_frames_generated_.store(0);
+    metric_audio_frames_written_.store(0);
+    metric_audio_frames_dropped_.store(0);
+    metric_audio_recoveries_.store(0);
+    metric_audio_write_errors_.store(0);
+    metric_audio_open_failures_.store(0);
+    metric_total_processing_us_.store(0);
+    metric_maximum_processing_us_.store(0);
+}
+
+void RadioSession::record_processing_time(uint64_t processing_us) {
+    metric_total_processing_us_.fetch_add(processing_us);
+    uint64_t current = metric_maximum_processing_us_.load();
+    while (processing_us > current &&
+           !metric_maximum_processing_us_.compare_exchange_weak(current, processing_us)) {
+    }
 }
 
 void RadioSession::set_state(RadioSessionState state,

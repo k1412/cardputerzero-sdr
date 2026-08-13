@@ -39,11 +39,31 @@ int main(int argc, char** argv) {
     assert((session.supported_gains() == std::vector<int>{-99, -40, 71, 179, 192}));
     assert(frame.sequence > 0);
     assert(session.audio_active());
+    auto metrics = session.metrics();
+    assert(metrics.connection_attempts == 1);
+    assert(metrics.successful_connections == 1);
+    assert(metrics.iq_blocks > 0);
+    assert(metrics.iq_bytes >= metrics.iq_blocks * 16'384);
+    assert(metrics.audio_frames_generated > 0);
+    assert(metrics.total_processing_us > 0);
+    assert(metrics.maximum_processing_us > 0);
+    const auto audio_metrics_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (session.metrics().audio_frames_written == 0 &&
+           std::chrono::steady_clock::now() < audio_metrics_deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    metrics = session.metrics();
+    assert(metrics.audio_frames_written > 0);
+    assert(metrics.audio_frames_dropped == 0);
+    assert(metrics.audio_recoveries == 0);
+    assert(metrics.audio_write_errors == 0);
+    assert(metrics.audio_open_failures == 0);
     session.request_frequency(103'900'000);
     session.request_gain(false, 190);
     session.request_muted(true);
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     assert(session.state() == device::RadioSessionState::Live);
+    assert(session.metrics().settings_updates >= 1);
 
     session.stop();
     assert(!session.started());
@@ -55,6 +75,9 @@ int main(int argc, char** argv) {
     no_audio_session.start();
     assert(wait_for_live_frame(no_audio_session, frame, false));
     assert(!no_audio_session.status_detail().empty());
+    metrics = no_audio_session.metrics();
+    assert(metrics.audio_open_failures == 1);
+    assert(metrics.audio_frames_generated == 0);
     no_audio_session.stop();
 
     // A permanent playback error must make audio inactive without taking the
@@ -63,5 +86,14 @@ int main(int argc, char** argv) {
     failing_audio_session.start();
     assert(wait_for_live_frame(failing_audio_session, frame, false));
     assert(failing_audio_session.status_detail().find("unrecoverable") != std::string::npos);
+    const auto metrics_deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (failing_audio_session.metrics().audio_write_errors == 0 &&
+           std::chrono::steady_clock::now() < metrics_deadline) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    metrics = failing_audio_session.metrics();
+    assert(metrics.audio_frames_generated > 0);
+    assert(metrics.audio_write_errors == 1);
+    assert(metrics.audio_recoveries == 0);
     failing_audio_session.stop();
 }

@@ -15,8 +15,10 @@
 #include "theme.h"
 
 #include <array>
+#include <cerrno>
 #include <cstdlib>
 #include <filesystem>
+#include <limits>
 #include <string>
 
 #if USE_DESKTOP
@@ -101,6 +103,23 @@ std::string writable_config_path() {
     return APP_CONFIG_FILE;
 }
 
+uint32_t diagnostics_interval_ms() {
+    constexpr uint32_t kDefaultIntervalMs = 30'000;
+    const char* value = std::getenv("ZERO_SDR_DIAGNOSTICS_INTERVAL_MS");
+    if (!value || value[0] == '\0') return kDefaultIntervalMs;
+
+    errno = 0;
+    char* end = nullptr;
+    const unsigned long parsed = std::strtoul(value, &end, 10);
+    if (errno != 0 || end == value || *end != '\0' || parsed < 100 ||
+        parsed > 3'600'000 || parsed > std::numeric_limits<uint32_t>::max()) {
+        LOG_WARN("invalid ZERO_SDR_DIAGNOSTICS_INTERVAL_MS={}; using {}", value,
+                 kDefaultIntervalMs);
+        return kDefaultIntervalMs;
+    }
+    return static_cast<uint32_t>(parsed);
+}
+
 void persist_settings_observer(lv_observer_t* observer, lv_subject_t* subject) {
     LV_UNUSED(subject);
     auto* persistence = static_cast<SettingsPersistence*>(lv_observer_get_user_data(observer));
@@ -164,6 +183,7 @@ lv_display_t* init_device_display() {
 int Application::run() {
     logger::Logger::init();
     logger::Logger::set_tag("zero-sdr");
+    logger::Logger::set_timestamp_enabled(true);
 
     lv_init();
 
@@ -267,6 +287,12 @@ int Application::run() {
 
     LOG_INFO("LVGL app started at {}x{}", lv_display_get_horizontal_resolution(display),
              lv_display_get_vertical_resolution(display));
+    const uint32_t diagnostics_interval = diagnostics_interval_ms();
+    const uint32_t diagnostics_started_at = lv_tick_get();
+    uint32_t diagnostics_last_at = diagnostics_started_at;
+    uint32_t ui_loop_last_at = diagnostics_started_at;
+    uint32_t ui_loop_max_gap_ms = 0;
+    uint64_t ui_loop_count = 0;
 #if USE_DESKTOP
     const char* screenshot_path = std::getenv("ZERO_SDR_SCREENSHOT");
     const bool exit_after_screenshot = std::getenv("ZERO_SDR_SCREENSHOT_EXIT") != nullptr;
@@ -279,6 +305,42 @@ int Application::run() {
 #endif
     ) {
         view_model.poll_radio_session();
+        const uint32_t now = lv_tick_get();
+        const uint32_t ui_loop_gap_ms = lv_tick_elaps(ui_loop_last_at);
+        if (ui_loop_gap_ms > ui_loop_max_gap_ms) ui_loop_max_gap_ms = ui_loop_gap_ms;
+        ui_loop_last_at = now;
+        ++ui_loop_count;
+        if (lv_tick_elaps(diagnostics_last_at) >= diagnostics_interval) {
+            const auto metrics = view_model.radio_metrics();
+            LOG_INFO("diagnostics uptime_ms={} frequency_hz={} muted={} "
+                     "ui_loops={} max_ui_gap_ms={} "
+                     "connection_attempts={} successful_connections={} retry_waits={} "
+                     "read_errors={} settings_updates={} iq_blocks={} iq_bytes={} "
+                     "audio_generated={} audio_written={} audio_dropped={} "
+                     "audio_recoveries={} audio_write_errors={} audio_open_failures={} "
+                     "total_processing_us={} max_processing_us={}",
+                     lv_tick_elaps(diagnostics_started_at),
+                     view_model.frequency_hz(),
+                     view_model.is_muted() ? 1 : 0,
+                     ui_loop_count,
+                     ui_loop_max_gap_ms,
+                     metrics.connection_attempts,
+                     metrics.successful_connections,
+                     metrics.retry_waits,
+                     metrics.read_errors,
+                     metrics.settings_updates,
+                     metrics.iq_blocks,
+                     metrics.iq_bytes,
+                     metrics.audio_frames_generated,
+                     metrics.audio_frames_written,
+                     metrics.audio_frames_dropped,
+                     metrics.audio_recoveries,
+                     metrics.audio_write_errors,
+                     metrics.audio_open_failures,
+                     metrics.total_processing_us,
+                     metrics.maximum_processing_us);
+            diagnostics_last_at = now;
+        }
         lv_timer_handler();
 #if USE_DESKTOP
         if (!screenshot_saved && screenshot_path && lv_tick_elaps(screenshot_started_at) >= 600U) {

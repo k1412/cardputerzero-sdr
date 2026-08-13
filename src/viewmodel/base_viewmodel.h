@@ -69,6 +69,7 @@ public:
     i18n::Locale locale() const;
     const char* text(i18n::Text text) const;
     const char* locale_font_asset() const;
+    device::RadioSessionMetrics radio_metrics() const;
     void poll_radio_session();
     dsp::SpectrumFrame next_spectrum_frame();
 

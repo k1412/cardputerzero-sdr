@@ -24,6 +24,7 @@ Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. 
 - Automatic gain plus device-reported manual gain steps, mute state, dark/light theme
 - Last-used frequency, tuning step, gain, mute, theme, and language persist across launches
 - Runtime-loaded RTL-SDR capture, channel-filtered WFM audio, and automatic reconnect
+- Structured 30-second receiver-health logs for IQ, audio, DSP, reconnect, and UI-loop measurements
 - Audited ARM64 Debian package with a private pinned librtlsdr runtime
 - Narrow `plugdev`/`uaccess` rules for the tested Realtek RTL2832U USB IDs; no root service
 - Ten UI languages: English, Simplified Chinese, Traditional Chinese, Spanish, Japanese, Korean, French, German, Brazilian Portuguese, and Russian
@@ -61,12 +62,12 @@ On the Settings gain row, Left/Right cycles `AUTO` and the exact gain values rep
 
 ## Desktop build
 
-Requirements: CMake 3.31+, Ninja, a C++17 compiler, SDL2, FreeType, libpng, libjpeg, and zlib. `fmt` 12.1.0 is fetched when a compatible system package is unavailable.
+Requirements: CMake 3.31+, Ninja, Python 3.9+, a C++17 compiler, SDL2, FreeType, libpng, libjpeg, and zlib. `fmt` 12.1.0 is fetched when a compatible system package is unavailable.
 
 On Debian/Ubuntu:
 
 ```sh
-sudo apt install build-essential cmake ninja-build libsdl2-dev \
+sudo apt install build-essential cmake ninja-build python3 libsdl2-dev \
   libfreetype-dev libpng-dev libjpeg-dev zlib1g-dev
 cmake --preset linux-x86-64
 cmake --build --preset linux-x86-64-dbg
@@ -88,6 +89,25 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 Run 50 screenshot checks—radio, settings, direct tuning, and both radio/settings audio-failure states in all ten locales—with `scripts/smoke_locales.sh`. To capture only the direct-tuning overlay, start on the radio page and set `ZERO_SDR_DIRECT_ENTRY=103.9`.
 
 Generate six reproducible receiver states—offline demo, fake-device `LIVE`, device-reported manual gain, `NO AUDIO`, direct tuning, and `NO DEVICE`—with `scripts/capture_demo_states.sh`.
+
+## Runtime diagnostics
+
+The app writes one structured `diagnostics` record to standard output every 30 seconds. Each record contains cumulative connection/retry/read-error counts, IQ blocks and bytes, audio generated/written/dropped frames, ALSA recovery/failure counts, DSP processing time, UI-loop count, and maximum UI-loop gap. Set `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` to a value from 100 to 3,600,000 when a different interval is needed.
+
+For a direct 30-minute device run, capture stdout:
+
+```sh
+ZERO_SDR_DIAGNOSTICS_INTERVAL_MS=30000 cardputerzero-sdr \
+  2>&1 | tee zero-sdr-30m.log
+```
+
+Copy the log to a development checkout, then summarize its final cumulative record on the development machine:
+
+```sh
+python3 scripts/summarize_diagnostics.py --p0 zero-sdr-30m.log
+```
+
+The `--p0` check requires at least 30 minutes, one uninterrupted connection, zero RF/audio errors or drops, IQ throughput within 10% of 4,096,000 bytes/s, unmuted audio output within 10% of 32,000 frames/s, and average processing below the 4,000 µs IQ-block budget. Maximum processing and UI-loop gaps are reported for the physical-device baseline but are not guessed release thresholds. See [the hardware test plan](docs/DEVICE_TEST_PLAN.md) for the complete procedure.
 
 ## Cardputer Zero build
 

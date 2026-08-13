@@ -175,6 +175,8 @@ bool AlsaAudioSink::open(const std::string& device_name,
 
     frames_written_.store(0);
     dropped_frames_.store(0);
+    recoveries_.store(0);
+    write_errors_.store(0);
     running_.store(true);
     healthy_.store(true);
     worker_ = std::thread(&AlsaAudioSink::worker_main, this);
@@ -223,8 +225,8 @@ bool AlsaAudioSink::submit(const int16_t* samples, size_t frame_count) {
 }
 
 void AlsaAudioSink::set_muted(bool muted) {
-    muted_.store(muted);
-    if (muted) {
+    const bool was_muted = muted_.exchange(muted);
+    if (muted && !was_muted) {
         std::lock_guard<std::mutex> lock(mutex_);
         queue_.clear();
     }
@@ -233,6 +235,8 @@ void AlsaAudioSink::set_muted(bool muted) {
 bool AlsaAudioSink::muted() const { return muted_.load(); }
 uint64_t AlsaAudioSink::frames_written() const { return frames_written_.load(); }
 uint64_t AlsaAudioSink::dropped_frames() const { return dropped_frames_.load(); }
+uint64_t AlsaAudioSink::recoveries() const { return recoveries_.load(); }
+uint64_t AlsaAudioSink::write_errors() const { return write_errors_.load(); }
 
 void AlsaAudioSink::worker_main() {
     while (running_.load()) {
@@ -251,12 +255,14 @@ void AlsaAudioSink::worker_main() {
             const auto remaining = static_cast<unsigned long>(chunk.size() - offset);
             long written = impl_->write_interleaved(impl_->pcm, chunk.data() + offset, remaining);
             if (written < 0) {
+                write_errors_.fetch_add(1);
                 const int recovered = impl_->recover(impl_->pcm, static_cast<int>(written), 1);
                 if (recovered < 0) {
                     healthy_.store(false);
                     running_.store(false);
                     return;
                 }
+                recoveries_.fetch_add(1);
                 continue;
             }
             if (written == 0) break;

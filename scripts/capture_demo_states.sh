@@ -31,6 +31,7 @@ capture() {
 capture demo env ZERO_SDR_DEMO=1
 capture direct-tune env ZERO_SDR_DEMO=1 ZERO_SDR_DIRECT_ENTRY=103.9
 capture live env ZERO_SDR_LIVE=1 \
+  ZERO_SDR_DIAGNOSTICS_INTERVAL_MS=100 \
   ZERO_SDR_RTLSDR_LIBRARY="$fake_rtlsdr" \
   ZERO_SDR_ALSA_LIBRARY="$fake_asound"
 capture manual-gain env ZERO_SDR_LIVE=1 \
@@ -43,3 +44,7 @@ capture live-no-audio env ZERO_SDR_LIVE=1 \
 capture no-device env ZERO_SDR_LIVE=1 \
   ZERO_SDR_RTLSDR_LIBRARY="$output_dir/missing-librtlsdr.so" \
   ZERO_SDR_ALSA_LIBRARY="$fake_asound"
+
+grep -Eq 'diagnostics .*ui_loops=[0-9]+ .*iq_blocks=[1-9][0-9]* .*total_processing_us=[1-9][0-9]*' \
+  "$output_dir/live.log"
+printf 'PASS diagnostics-log\n'

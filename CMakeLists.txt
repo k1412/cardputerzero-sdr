@@ -803,6 +803,12 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     target_link_libraries(radio_session_test PRIVATE ${PROJECT_NAME}_device)
     add_test(NAME radio_session
              COMMAND radio_session_test $<TARGET_FILE:fake_rtlsdr> $<TARGET_FILE:fake_asound>)
+
+    find_package(Python3 3.9 COMPONENTS Interpreter REQUIRED)
+    add_test(NAME diagnostics_log
+             COMMAND ${Python3_EXECUTABLE}
+                     "${CMAKE_CURRENT_SOURCE_DIR}/tests/diagnostics_log_test.py"
+                     "${CMAKE_CURRENT_SOURCE_DIR}/scripts/summarize_diagnostics.py")
 endif()
 
 # Package deb

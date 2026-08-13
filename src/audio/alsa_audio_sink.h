@@ -34,6 +34,8 @@ public:
     bool muted() const;
     uint64_t frames_written() const;
     uint64_t dropped_frames() const;
+    uint64_t recoveries() const;
+    uint64_t write_errors() const;
 
 private:
     class Impl;
@@ -49,6 +51,8 @@ private:
     std::atomic<bool> muted_{false};
     std::atomic<uint64_t> frames_written_{0};
     std::atomic<uint64_t> dropped_frames_{0};
+    std::atomic<uint64_t> recoveries_{0};
+    std::atomic<uint64_t> write_errors_{0};
 };
 
 } // namespace audio

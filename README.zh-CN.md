@@ -24,6 +24,7 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 - 自动增益与设备上报的手动增益档位、静音、深色/浅色主题
 - 自动保存上次使用的频率、步进、增益、静音、主题和语言
 - 运行时加载 RTL-SDR、带信道滤波的 WFM 音频与自动重连
+- 每 30 秒输出结构化接收健康日志，记录 IQ、音频、DSP、重连和界面循环指标
 - 经审计的 ARM64 Debian 安装包，内含固定版本的私有 librtlsdr 运行库
 - 仅针对已测试 Realtek RTL2832U USB ID 的 `plugdev`/`uaccess` 规则；不安装 root 服务
 - 十种界面语言：英语、简体中文、繁体中文、西班牙语、日语、韩语、法语、德语、巴西葡萄牙语和俄语
@@ -61,12 +62,12 @@ Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接�
 
 ## 桌面构建
 
-依赖：CMake 3.31+、Ninja、支持 C++17 的编译器、SDL2、FreeType、libpng、libjpeg 和 zlib。找不到兼容的系统 `fmt` 时会获取固定版本 12.1.0。
+依赖：CMake 3.31+、Ninja、Python 3.9+、支持 C++17 的编译器、SDL2、FreeType、libpng、libjpeg 和 zlib。找不到兼容的系统 `fmt` 时会获取固定版本 12.1.0。
 
 Debian/Ubuntu：
 
 ```sh
-sudo apt install build-essential cmake ninja-build libsdl2-dev \
+sudo apt install build-essential cmake ninja-build python3 libsdl2-dev \
   libfreetype-dev libpng-dev libjpeg-dev zlib1g-dev
 cmake --preset linux-x86-64
 cmake --build --preset linux-x86-64-dbg
@@ -88,6 +89,25 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 使用 `scripts/smoke_locales.sh` 可执行 50 项截图检查：十种语言各覆盖无线电、设置、直接调谐，以及无线电/设置页的音频故障状态。如只需截取直接调谐浮层，请从无线电页面启动并设置 `ZERO_SDR_DIRECT_ENTRY=103.9`。
 
 使用 `scripts/capture_demo_states.sh` 可生成六种可重复的接收状态：离线演示、模拟设备 `LIVE`、设备上报的手动增益、`NO AUDIO`、直接调谐和 `NO DEVICE`。
+
+## 运行诊断
+
+应用默认每 30 秒向标准输出写入一条结构化 `diagnostics` 记录，其中包含累计连接/重试/读取错误、IQ 数据块与字节数、音频生成/写入/丢帧、ALSA 恢复与故障、DSP 处理耗时、界面循环次数和最大界面循环间隔。需要调整周期时，可将 `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` 设置为 100–3,600,000 毫秒。
+
+在设备上直接连续运行 30 分钟时，先保存标准输出：
+
+```sh
+ZERO_SDR_DIAGNOSTICS_INTERVAL_MS=30000 cardputerzero-sdr \
+  2>&1 | tee zero-sdr-30m.log
+```
+
+把日志复制到开发机上的项目仓库，再在开发机汇总最后一条累计记录：
+
+```sh
+python3 scripts/summarize_diagnostics.py --p0 zero-sdr-30m.log
+```
+
+`--p0` 检查要求：连续运行至少 30 分钟、仅有一次无中断连接、RF/音频错误和丢帧均为零、IQ 吞吐在 4,096,000 字节/秒的 ±10% 内、未静音音频写入在 32,000 帧/秒的 ±10% 内，并且平均处理耗时小于每个 IQ 数据块 4,000 微秒的实时预算。最大单次处理耗时和界面循环间隔会被记录，用于建立实体设备基线，不会在没有实测数据时臆定发布阈值。完整步骤见[硬件测试计划](docs/DEVICE_TEST_PLAN.md)。
 
 ## Cardputer Zero 构建
 

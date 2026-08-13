@@ -8,12 +8,15 @@ extern "C" {
 struct snd_pcm {
     unsigned int sample_rate{0};
     bool fail_writes{false};
+    bool recover_once{false};
+    bool failed_once{false};
 };
 
 int snd_pcm_open(snd_pcm** output, const char* device_name, int, int) {
     if (!output) return -1;
     *output = new snd_pcm{};
     (*output)->fail_writes = device_name && std::strcmp(device_name, "fail") == 0;
+    (*output)->recover_once = device_name && std::strcmp(device_name, "recover") == 0;
     return 0;
 }
 
@@ -31,7 +34,12 @@ int snd_pcm_set_params(snd_pcm* pcm, int, int, unsigned int channels,
 
 long snd_pcm_writei(snd_pcm* pcm, const void*, unsigned long frames) {
     if (!pcm) return -3;
-    return pcm->fail_writes ? -5 : static_cast<long>(frames);
+    if (pcm->fail_writes) return -5;
+    if (pcm->recover_once && !pcm->failed_once) {
+        pcm->failed_once = true;
+        return -5;
+    }
+    return static_cast<long>(frames);
 }
 
 int snd_pcm_recover(snd_pcm* pcm, int, int) {

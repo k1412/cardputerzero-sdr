@@ -249,6 +249,10 @@ const char* BaseViewModel::locale_font_asset() const {
     return i18n::locale_info(locale()).font_asset;
 }
 
+device::RadioSessionMetrics BaseViewModel::radio_metrics() const {
+    return radio_session_.metrics();
+}
+
 void BaseViewModel::poll_radio_session() {
     if (!radio_session_.started()) return;
 

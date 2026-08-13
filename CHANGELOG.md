@@ -21,6 +21,8 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Context-aware key-repeat policy that prevents held discrete keys from toggling values or pages repeatedly
 - Device-reported discrete tuner gain profiles with nearest-value enforcement and full FC0012 negative-gain support
 - XDG-scoped mutable settings so desktop use and screenshot automation never rewrite repository/package defaults
+- Structured receiver-health telemetry plus an automated 30-minute P0 log summarizer
+- Muted/unavailable-audio WFM bypass to preserve device CPU budget without stopping RF visualization
 
 ### Known limitations
 

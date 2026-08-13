@@ -98,16 +98,10 @@ std::string current_timestamp() {
 #endif
 
 
-    char buffer[32];
-    std::snprintf(buffer,
-                  sizeof(buffer),
-                  "%d-%d-%d %02d:%02d:%02d",
-                  tm_now.tm_year + 1900,
-                  tm_now.tm_mon + 1,
-                  tm_now.tm_mday,
-                  tm_now.tm_hour,
-                  tm_now.tm_min,
-                  tm_now.tm_sec);
+    char buffer[32]{};
+    if (std::strftime(buffer, sizeof(buffer), "%Y-%m-%d %H:%M:%S", &tm_now) == 0) {
+        return "unknown-time";
+    }
     return buffer;
 }
 
@@ -205,6 +199,7 @@ void Logger::log(LogLevel level,
                prefix.c_str(),
                msg.c_str());
     }
+    std::fflush(stdout);
 }
 
 } // namespace logger
