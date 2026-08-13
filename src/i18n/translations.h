@@ -30,6 +30,7 @@ enum class Text : uint8_t {
     DeviceError,
     GainAuto,
     Muted,
+    NoAudio,
     Step,
     Tune,
     Settings,

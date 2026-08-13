@@ -176,16 +176,17 @@ bool AlsaAudioSink::open(const std::string& device_name,
     frames_written_.store(0);
     dropped_frames_.store(0);
     running_.store(true);
+    healthy_.store(true);
     worker_ = std::thread(&AlsaAudioSink::worker_main, this);
     error.clear();
     return true;
 }
 
 void AlsaAudioSink::close() {
-    if (running_.exchange(false)) {
-        condition_.notify_all();
-        if (worker_.joinable()) worker_.join();
-    }
+    running_.store(false);
+    healthy_.store(false);
+    condition_.notify_all();
+    if (worker_.joinable()) worker_.join();
     {
         std::lock_guard<std::mutex> lock(mutex_);
         queue_.clear();
@@ -193,13 +194,16 @@ void AlsaAudioSink::close() {
     impl_->close();
 }
 
-bool AlsaAudioSink::is_open() const { return impl_->pcm != nullptr && running_.load(); }
+bool AlsaAudioSink::is_open() const {
+    return running_.load() && healthy_.load();
+}
 
 bool AlsaAudioSink::submit(const int16_t* samples, size_t frame_count) {
     if (!is_open() || !samples || frame_count == 0) return false;
     if (muted_.load()) return true;
 
     std::lock_guard<std::mutex> lock(mutex_);
+    if (!is_open()) return false;
     size_t queued_frames = 0;
     for (const auto& chunk : queue_) queued_frames += chunk.size();
     while (!queue_.empty() && queued_frames + frame_count > kMaximumQueuedFrames) {
@@ -248,7 +252,11 @@ void AlsaAudioSink::worker_main() {
             long written = impl_->write_interleaved(impl_->pcm, chunk.data() + offset, remaining);
             if (written < 0) {
                 const int recovered = impl_->recover(impl_->pcm, static_cast<int>(written), 1);
-                if (recovered < 0) break;
+                if (recovered < 0) {
+                    healthy_.store(false);
+                    running_.store(false);
+                    return;
+                }
                 continue;
             }
             if (written == 0) break;

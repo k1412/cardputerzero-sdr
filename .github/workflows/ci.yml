@@ -36,7 +36,9 @@ jobs:
           python -m pip install --disable-pip-version-check "cmake>=3.31,<5" ninja
 
       - name: Validate Store metadata and assets
-        run: python scripts/validate_store_assets.py
+        run: |
+          python scripts/validate_store_assets.py
+          python scripts/validate_font_assets.py
 
       - name: Configure
         run: cmake --preset linux-x86-64
@@ -47,7 +49,7 @@ jobs:
       - name: Test
         run: ctest --test-dir build/linux-x86-64 -C Debug --output-on-failure
 
-      - name: Smoke-test all locales
+      - name: Smoke-test all locales and audio states
         run: scripts/smoke_locales.sh ./build/linux-x86-64/Debug/cardputerzero-sdr locale-smoke
 
       - name: Capture demo and device states

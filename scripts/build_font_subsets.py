@@ -34,7 +34,7 @@ def translation_text(source: Path) -> str:
     return ASCII_UI + "".join(strings)
 
 
-def build_subset(source: Path, destination: Path, text: str, font_number: int | None = None) -> None:
+def build_subset(source: Path, destination: Path, text: str) -> None:
     options = subset.Options()
     options.layout_features = ["*"]
     options.name_IDs = [0, 1, 2, 3, 4, 5, 6]
@@ -42,10 +42,11 @@ def build_subset(source: Path, destination: Path, text: str, font_number: int | 
     options.name_languages = [0x409]
     options.recalc_bounds = True
     options.recalc_timestamp = False
-    if font_number is not None:
-        options.font_number = font_number
-
     font = subset.load_font(str(source), options)
+    if "CFF " in font or "CFF2" in font:
+        raise ValueError(
+            f"unsupported CFF outline source {source}; use the official variable TrueType font"
+        )
     if "fvar" in font:
         # Freeze Google Fonts variable sources at Regular.  Besides producing a
         # smaller file, this keeps the embedded LVGL/FreeType path simple.
@@ -64,11 +65,6 @@ def main() -> None:
         type=Path,
         default=Path("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf"),
     )
-    parser.add_argument(
-        "--noto-cjk",
-        type=Path,
-        default=Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
-    )
     parser.add_argument("--noto-jp", type=Path)
     parser.add_argument("--noto-kr", type=Path)
     parser.add_argument("--noto-sc", type=Path)
@@ -77,31 +73,25 @@ def main() -> None:
     args = parser.parse_args()
 
     separate_cjk = (args.noto_jp, args.noto_kr, args.noto_sc, args.noto_tc)
-    if any(separate_cjk) and not all(separate_cjk):
-        raise SystemExit("pass all four of --noto-jp/kr/sc/tc, or none of them")
+    if not all(separate_cjk):
+        raise SystemExit(
+            "pass all four TrueType variable fonts with "
+            "--noto-jp/kr/sc/tc; CFF-flavored Noto CJK TTC files are not supported"
+        )
 
-    sources = (args.noto_sans,) + (separate_cjk if all(separate_cjk) else (args.noto_cjk,))
+    sources = (args.noto_sans,) + separate_cjk
     for source in sources:
         if not source.is_file():
             raise SystemExit(f"missing source font: {source}")
 
     text = translation_text(Path("src/i18n/translations.cpp"))
     build_subset(args.noto_sans, args.output / "noto-ui.ttf", text)
-    if all(separate_cjk):
-        cjk_sources = zip(
-            ("noto-cjk-jp-ui.ttf", "noto-cjk-kr-ui.ttf", "noto-cjk-sc-ui.ttf", "noto-cjk-tc-ui.ttf"),
-            separate_cjk,
-        )
-        for filename, source in cjk_sources:
-            build_subset(source, args.output / filename, text)
-    else:
-        for filename, font_number in (
-            ("noto-cjk-jp-ui.ttf", 0),
-            ("noto-cjk-kr-ui.ttf", 1),
-            ("noto-cjk-sc-ui.ttf", 2),
-            ("noto-cjk-tc-ui.ttf", 3),
-        ):
-            build_subset(args.noto_cjk, args.output / filename, text, font_number)
+    cjk_sources = zip(
+        ("noto-cjk-jp-ui.ttf", "noto-cjk-kr-ui.ttf", "noto-cjk-sc-ui.ttf", "noto-cjk-tc-ui.ttf"),
+        separate_cjk,
+    )
+    for filename, source in cjk_sources:
+        build_subset(source, args.output / filename, text)
 
 
 if __name__ == "__main__":

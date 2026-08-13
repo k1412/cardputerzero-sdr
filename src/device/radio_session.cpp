@@ -160,7 +160,12 @@ void RadioSession::worker_main() {
             auto frame = spectrum.process(iq_buffer.data(), bytes_read);
             const auto audio = demodulator.process(iq_buffer.data(), bytes_read);
             if (audio_active_.load() && !audio.empty()) {
-                audio_sink.submit(audio.data(), audio.size());
+                if (!audio_sink.submit(audio.data(), audio.size())) {
+                    audio_active_.store(false);
+                    set_state(RadioSessionState::Live,
+                              "ALSA audio output stopped after an unrecoverable write error",
+                              available_devices.front().name);
+                }
             }
             {
                 std::lock_guard<std::mutex> lock(data_mutex_);

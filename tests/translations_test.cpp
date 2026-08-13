@@ -25,5 +25,6 @@ int main() {
     }
 
     assert(std::strcmp(i18n::translate(i18n::Locale::SimplifiedChinese, i18n::Text::Settings), "设置") == 0);
+    assert(std::strcmp(i18n::translate(i18n::Locale::SimplifiedChinese, i18n::Text::NoAudio), "无音频") == 0);
     assert(std::strcmp(i18n::translate(i18n::Locale::Japanese, i18n::Text::Language), "言語") == 0);
 }

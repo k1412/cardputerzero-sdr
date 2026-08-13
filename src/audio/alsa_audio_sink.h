@@ -45,6 +45,7 @@ private:
     std::deque<std::vector<int16_t>> queue_;
     std::thread worker_;
     std::atomic<bool> running_{false};
+    std::atomic<bool> healthy_{false};
     std::atomic<bool> muted_{false};
     std::atomic<uint64_t> frames_written_{0};
     std::atomic<uint64_t> dropped_frames_{0};

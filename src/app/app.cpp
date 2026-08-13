@@ -282,6 +282,7 @@ int Application::run() {
            && simulator_frame.process_events()
 #endif
     ) {
+        view_model.poll_radio_session();
         lv_timer_handler();
 #if USE_DESKTOP
         if (!screenshot_saved && screenshot_path && lv_tick_elaps(screenshot_started_at) >= 600U) {

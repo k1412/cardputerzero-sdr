@@ -25,7 +25,6 @@ private:
     static constexpr int kWaterfallHeight = 19;
 
     static void refresh_timer_cb(lv_timer_t* timer);
-    static void muted_observer_cb(lv_observer_t* observer, lv_subject_t* subject);
     void refresh_locale();
     void refresh_spectrum();
     void update_waterfall(const dsp::SpectrumFrame& frame);
@@ -43,7 +42,7 @@ private:
     lv_obj_t* source_label_{nullptr};
     lv_obj_t* gain_label_{nullptr};
     lv_obj_t* step_label_{nullptr};
-    lv_obj_t* muted_label_{nullptr};
+    lv_obj_t* audio_warning_label_{nullptr};
     lv_obj_t* direct_panel_{nullptr};
     lv_obj_t* direct_title_{nullptr};
     lv_obj_t* direct_value_{nullptr};

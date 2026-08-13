@@ -25,8 +25,9 @@ Long device states use ellipsis. Settings values have a fixed right-aligned colu
 - Settings row selection wraps for fast one-handed use.
 - Esc from settings returns to radio; Esc from radio exits to the launcher.
 - Missing hardware must show `NO DEVICE` while keeping settings and demo behavior usable.
+- Audio initialization or playback failure must show `NO AUDIO` while preserving live RF, spectrum, settings, and keyboard control.
 - USB or DSP failure must not freeze input or leave loud/stale audio playing.
 
 ## Accessibility and localization
 
-The dark palette maintains high contrast and reserves amber/red for mode and warning states. Meaning is not conveyed by color alone: `DEMO`, `LIVE`, mute, and device errors are textual. Locale-specific fonts are bundled so CJK and Cyrillic rendering does not depend on the system image.
+The dark palette maintains high contrast and reserves amber/red for mode and warning states. Meaning is not conveyed by color alone: `DEMO`, `LIVE`, mute, `NO AUDIO`, and device errors are textual. Locale-specific fonts are bundled so CJK and Cyrillic rendering does not depend on the system image.

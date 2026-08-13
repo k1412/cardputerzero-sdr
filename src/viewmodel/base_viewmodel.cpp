@@ -44,6 +44,8 @@ BaseViewModel::BaseViewModel()
       step_subject_("200 kHz"),
       locale_name_subject_("English"),
       muted_subject_(model_.muted()),
+      audio_status_subject_("DEMO"),
+      audio_warning_subject_(""),
       dark_mode_subject_(model_.dark_mode()),
       current_page_subject_(page_to_int(model_.current_page())),
       locale_subject_(static_cast<int>(model_.locale_index())),
@@ -58,6 +60,7 @@ BaseViewModel::BaseViewModel()
         radio_session_.request_frequency(model_.frequency_hz());
         radio_session_.request_gain(model_.automatic_gain(), model_.gain_tenths_db());
         radio_session_.start();
+        poll_radio_session();
     }
 }
 
@@ -89,6 +92,14 @@ lv_subject_t* BaseViewModel::locale_name_subject() {
 
 lv_subject_t* BaseViewModel::muted_subject() {
     return muted_subject_.native();
+}
+
+lv_subject_t* BaseViewModel::audio_status_subject() {
+    return audio_status_subject_.native();
+}
+
+lv_subject_t* BaseViewModel::audio_warning_subject() {
+    return audio_warning_subject_.native();
 }
 
 lv_subject_t* BaseViewModel::dark_mode_subject() {
@@ -238,28 +249,37 @@ const char* BaseViewModel::locale_font_asset() const {
     return i18n::locale_info(locale()).font_asset;
 }
 
+void BaseViewModel::poll_radio_session() {
+    if (!radio_session_.started()) return;
+
+    const auto session_state = radio_session_.state();
+    const bool audio_active = radio_session_.audio_active();
+    switch (session_state) {
+        case device::RadioSessionState::Stopped:
+        case device::RadioSessionState::Connecting:
+            model_.set_source_state(model::SourceState::Connecting);
+            break;
+        case device::RadioSessionState::Live:
+            model_.set_source_state(model::SourceState::Live);
+            break;
+        case device::RadioSessionState::Missing:
+            model_.set_source_state(model::SourceState::Missing);
+            break;
+        case device::RadioSessionState::Error:
+            model_.set_source_state(model::SourceState::Error);
+            break;
+    }
+    if (session_state != published_session_state_ || audio_active != published_audio_active_) {
+        published_session_state_ = session_state;
+        published_audio_active_ = audio_active;
+        publish_radio_state();
+    }
+}
+
 dsp::SpectrumFrame BaseViewModel::next_spectrum_frame() {
     if (radio_session_.started()) {
+        poll_radio_session();
         const auto session_state = radio_session_.state();
-        switch (session_state) {
-            case device::RadioSessionState::Stopped:
-            case device::RadioSessionState::Connecting:
-                model_.set_source_state(model::SourceState::Connecting);
-                break;
-            case device::RadioSessionState::Live:
-                model_.set_source_state(model::SourceState::Live);
-                break;
-            case device::RadioSessionState::Missing:
-                model_.set_source_state(model::SourceState::Missing);
-                break;
-            case device::RadioSessionState::Error:
-                model_.set_source_state(model::SourceState::Error);
-                break;
-        }
-        if (session_state != published_session_state_) {
-            published_session_state_ = session_state;
-            publish_radio_state();
-        }
         dsp::SpectrumFrame live_frame;
         if (radio_session_.latest_spectrum(live_frame)) return live_frame;
         return {};
@@ -306,6 +326,24 @@ void BaseViewModel::publish_radio_state() {
     }
     step_subject_.set(buffer.data());
     muted_subject_.set(model_.muted());
+
+    if (model_.muted()) {
+        audio_status_subject_.set(text(i18n::Text::Muted));
+        audio_warning_subject_.set(text(i18n::Text::Muted));
+    }
+    else if (model_.source_state() == model::SourceState::Demo) {
+        audio_status_subject_.set(text(i18n::Text::Demo));
+        audio_warning_subject_.set("");
+    }
+    else if (model_.source_state() == model::SourceState::Live && published_audio_active_) {
+        audio_status_subject_.set(text(i18n::Text::On));
+        audio_warning_subject_.set("");
+    }
+    else {
+        audio_status_subject_.set(text(i18n::Text::NoAudio));
+        audio_warning_subject_.set(
+            model_.source_state() == model::SourceState::Live ? text(i18n::Text::NoAudio) : "");
+    }
 }
 
 void BaseViewModel::publish_locale_state() {

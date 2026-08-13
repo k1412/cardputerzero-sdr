@@ -24,6 +24,9 @@ capture direct-tune env ZERO_SDR_DEMO=1 ZERO_SDR_DIRECT_ENTRY=103.9
 capture live env ZERO_SDR_LIVE=1 \
   ZERO_SDR_RTLSDR_LIBRARY="$fake_rtlsdr" \
   ZERO_SDR_ALSA_LIBRARY="$fake_asound"
+capture live-no-audio env ZERO_SDR_LIVE=1 \
+  ZERO_SDR_RTLSDR_LIBRARY="$fake_rtlsdr" \
+  ZERO_SDR_ALSA_LIBRARY="$output_dir/missing-libasound.so"
 capture no-device env ZERO_SDR_LIVE=1 \
   ZERO_SDR_RTLSDR_LIBRARY="$output_dir/missing-librtlsdr.so" \
   ZERO_SDR_ALSA_LIBRARY="$fake_asound"

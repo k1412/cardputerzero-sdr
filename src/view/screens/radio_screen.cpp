@@ -95,12 +95,11 @@ void RadioScreen::build_content(lv_obj_t* content) {
     lv_obj_set_style_text_color(step_label_, colors.text_disabled, 0);
     lv_obj_align(step_label_, LV_ALIGN_TOP_MID, 4, 34);
 
-    muted_label_ = lv_label_create(content);
-    lv_obj_set_style_text_font(muted_label_, small_font, 0);
-    lv_obj_set_style_text_color(muted_label_, lv_color_hex(0xff6b6b), 0);
-    lv_obj_align(muted_label_, LV_ALIGN_TOP_RIGHT, -8, 34);
-    lv_label_set_text(muted_label_, view_model().is_muted() ? view_model().text(i18n::Text::Muted) : "");
-    lv_subject_add_observer_obj(view_model().muted_subject(), muted_observer_cb, muted_label_, this);
+    audio_warning_label_ = lv_label_create(content);
+    lv_label_bind_text(audio_warning_label_, view_model().audio_warning_subject(), nullptr);
+    lv_obj_set_style_text_font(audio_warning_label_, small_font, 0);
+    lv_obj_set_style_text_color(audio_warning_label_, lv_color_hex(0xff6b6b), 0);
+    lv_obj_align(audio_warning_label_, LV_ALIGN_TOP_RIGHT, -8, 34);
 
     chart_ = lv_chart_create(content);
     lv_obj_remove_style_all(chart_);
@@ -302,32 +301,18 @@ void RadioScreen::refresh_timer_cb(lv_timer_t* timer) {
     }
 }
 
-void RadioScreen::muted_observer_cb(lv_observer_t* observer, lv_subject_t* subject) {
-    auto* screen = static_cast<RadioScreen*>(lv_observer_get_user_data(observer));
-    auto* label = lv_observer_get_target_obj(observer);
-    if (!screen || !label) {
-        return;
-    }
-    lv_label_set_text(label,
-                      lv_subject_get_int(subject) ? screen->view_model().text(i18n::Text::Muted) : "");
-}
-
 void RadioScreen::refresh_locale() {
     auto* locale_font = assets().load_font(view_model().locale_font_asset(), 10);
     if (!locale_font) locale_font = assets().load_font("inter-regular.ttf", 10);
     if (!locale_font) locale_font = const_cast<lv_font_t*>(&lv_font_montserrat_12);
 
-    for (auto* label : {source_label_, gain_label_, step_label_, muted_label_}) {
+    for (auto* label : {source_label_, gain_label_, step_label_, audio_warning_label_}) {
         if (label) {
             lv_obj_set_style_text_font(label, locale_font, 0);
         }
     }
     for (auto* label : {direct_title_, direct_hint_}) {
         if (label) lv_obj_set_style_text_font(label, locale_font, 0);
-    }
-    if (muted_label_) {
-        lv_label_set_text(muted_label_,
-                          view_model().is_muted() ? view_model().text(i18n::Text::Muted) : "");
     }
     if (direct_entry_active_) refresh_direct_entry();
 }

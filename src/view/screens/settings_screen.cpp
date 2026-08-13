@@ -40,6 +40,8 @@ void SettingsScreen::build_content(lv_obj_t* content) {
         values_[index] = value;
     }
 
+    lv_label_bind_text(values_[3], view_model().audio_status_subject(), nullptr);
+
     refresh_rows();
 }
 
@@ -101,7 +103,7 @@ void SettingsScreen::refresh_rows() {
         i18n::locale_info(view_model().locale()).native_name,
         view_model().is_dark_mode() ? view_model().text(i18n::Text::Dark) : view_model().text(i18n::Text::Light),
         lv_subject_get_string(view_model().gain_subject()),
-        view_model().is_muted() ? view_model().text(i18n::Text::Muted) : view_model().text(i18n::Text::On),
+        lv_subject_get_string(view_model().audio_status_subject()),
     };
 
     auto* locale_font = assets().load_font(view_model().locale_font_asset(), 12);
@@ -110,7 +112,7 @@ void SettingsScreen::refresh_rows() {
 
     for (size_t index = 0; index < kRowCount; ++index) {
         lv_label_set_text(labels_[index], labels[index]);
-        lv_label_set_text(values_[index], values[index]);
+        if (index != 3) lv_label_set_text(values_[index], values[index]);
         lv_obj_set_style_text_font(labels_[index], locale_font, 0);
         lv_obj_set_style_text_font(values_[index], locale_font, 0);
         lv_obj_set_style_text_color(labels_[index], colors.text, 0);
