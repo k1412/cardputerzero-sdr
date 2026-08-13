@@ -7,7 +7,7 @@
   "store": {
     "summary": "Tune RTL-SDR with a native spectrum, waterfall, and direct Cardputer keyboard entry.",
     "description": "A Cardputer Zero-native SDR receiver designed for its 320×170 screen and physical keyboard. It includes a deterministic offline demo plus a local RTL-SDR/WFM receive path; the first store release is held until USB, audio, and performance validation passes on physical hardware.",
-    "categories": ["Tools", "Radio"],
+    "categories": ["Utilities", "Audio", "Hardware"],
     "screenshots": [
       "screenshots/radio-dark.png",
       "screenshots/direct-tune-dark.png",
@@ -18,7 +18,8 @@
     "license": "MIT",
     "source_repo": "https://github.com/k1412/cardputerzero-sdr",
     "author": {
-      "github": "k1412"
+      "github": "k1412",
+      "display_name": "k1412"
     },
     "permissions": [
       "audio",
