@@ -277,6 +277,12 @@ void BaseViewModel::poll_radio_session() {
         case device::RadioSessionState::Missing:
             model_.set_source_state(model::SourceState::Missing);
             break;
+        case device::RadioSessionState::AccessDenied:
+            model_.set_source_state(model::SourceState::AccessDenied);
+            break;
+        case device::RadioSessionState::Busy:
+            model_.set_source_state(model::SourceState::Busy);
+            break;
         case device::RadioSessionState::Error:
             model_.set_source_state(model::SourceState::Error);
             break;
@@ -318,6 +324,8 @@ void BaseViewModel::publish_radio_state() {
         case model::SourceState::Connecting: source_subject_.set(text(i18n::Text::Connecting)); break;
         case model::SourceState::Live: source_subject_.set(text(i18n::Text::Live)); break;
         case model::SourceState::Missing: source_subject_.set(text(i18n::Text::DeviceMissing)); break;
+        case model::SourceState::AccessDenied: source_subject_.set(text(i18n::Text::UsbAccess)); break;
+        case model::SourceState::Busy: source_subject_.set(text(i18n::Text::DeviceBusy)); break;
         case model::SourceState::Error: source_subject_.set(text(i18n::Text::DeviceError)); break;
     }
 
@@ -339,7 +347,15 @@ void BaseViewModel::publish_radio_state() {
     step_subject_.set(buffer.data());
     muted_subject_.set(model_.muted());
 
-    if (model_.muted()) {
+    if (model_.source_state() == model::SourceState::AccessDenied) {
+        audio_status_subject_.set(text(i18n::Text::NoAudio));
+        audio_warning_subject_.set(text(i18n::Text::ReconnectUsb));
+    }
+    else if (model_.source_state() == model::SourceState::Busy) {
+        audio_status_subject_.set(text(i18n::Text::NoAudio));
+        audio_warning_subject_.set(text(i18n::Text::CloseOtherSdr));
+    }
+    else if (model_.muted()) {
         audio_status_subject_.set(text(i18n::Text::Muted));
         audio_warning_subject_.set(text(i18n::Text::Muted));
     }

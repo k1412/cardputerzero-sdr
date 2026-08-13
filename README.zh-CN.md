@@ -87,15 +87,15 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 ./build/linux-x86-64/Debug/cardputerzero-sdr
 ```
 
-使用 `scripts/smoke_locales.sh` 可执行 50 项截图检查：十种语言各覆盖无线电、设置、直接调谐，以及无线电/设置页的音频故障状态。如只需截取直接调谐浮层，请从无线电页面启动并设置 `ZERO_SDR_DIRECT_ENTRY=103.9`。
+使用 `scripts/smoke_locales.sh` 可执行 60 项截图检查：十种语言各覆盖无线电、设置、直接调谐、无线电/设置页的音频故障，以及 USB 权限恢复提示。如只需截取直接调谐浮层，请从无线电页面启动并设置 `ZERO_SDR_DIRECT_ENTRY=103.9`。
 
-使用 `scripts/capture_demo_states.sh` 可生成六种可重复的接收状态：离线演示、模拟设备 `LIVE`、设备上报的手动增益、`NO AUDIO`、直接调谐和 `NO DEVICE`。
+使用 `scripts/capture_demo_states.sh` 可生成八种可重复的接收状态：离线演示、模拟设备 `LIVE`、设备上报的手动增益、`NO AUDIO`、直接调谐、`NO DEVICE`、USB 权限不足和设备被占用。
 
 ## 运行诊断
 
 应用默认每 30 秒向标准输出写入一条结构化 `diagnostics` 记录，其中包含累计连接/重试/读取错误、IQ 数据块与字节数、音频生成/写入/丢帧、ALSA 恢复与故障、DSP 处理耗时、界面循环次数和最大界面循环间隔。需要调整周期时，可将 `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` 设置为 100–3,600,000 毫秒。
 
-ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设备预检与证据采集工具。运行时不要同时从 APPLaunch 启动第二个 Zero SDR 实例。先通过 SSH 或本地终端，以正常 APPLaunch 用户检查原生 320×170 帧缓冲、官方 APPLaunch/Cardputer 键盘路径、RTL-SDR USB 节点和可写 ALSA 播放节点：
+ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设备预检与证据采集工具。运行时不要同时从 APPLaunch 启动第二个 Zero SDR 实例。先通过 SSH 或本地终端，以正常 APPLaunch 用户检查已安装的 ARM64 应用和 `librtlsdr0` 包、`plugdev` 成员资格、发行版维护的 RTL-SDR 规则、USB 高速链路、原生 320×170 帧缓冲、官方 APPLaunch/Cardputer 键盘路径、RTL-SDR USB 节点和可写 ALSA 播放节点：
 
 ```sh
 cardputerzero-sdr-p0 --preflight-only
@@ -127,7 +127,7 @@ python3 scripts/summarize_diagnostics.py --p0 path/to/evidence/app.log
 cmake --workflow --preset cp0-cross-package
 ```
 
-预期安装包：`dist/cardputerzero-sdr_0.1.0-2_arm64.deb`。
+预期安装包：`dist/cardputerzero-sdr_0.1.0-3_arm64.deb`。
 
 交叉编译成功不等同于实机验证。发布前必须完成[硬件测试计划](docs/DEVICE_TEST_PLAN.md)中的检查。
 

@@ -19,6 +19,8 @@ enum class RadioSessionState : uint8_t {
     Connecting,
     Live,
     Missing,
+    AccessDenied,
+    Busy,
     Error,
 };
 

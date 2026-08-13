@@ -139,9 +139,32 @@ void RadioSession::worker_main() {
         }
 
         std::string error;
-        if (!radio.open(available_devices.front().index, error)) {
+        const auto open_result = radio.open(available_devices.front().index, error);
+        if (open_result != RtlSdrOpenResult::Opened) {
             radio.close();
-            set_state(RadioSessionState::Error, error, available_devices.front().name);
+            switch (open_result) {
+                case RtlSdrOpenResult::AccessDenied:
+                    set_state(RadioSessionState::AccessDenied,
+                              error,
+                              available_devices.front().name);
+                    break;
+                case RtlSdrOpenResult::Busy:
+                    set_state(RadioSessionState::Busy,
+                              error,
+                              available_devices.front().name);
+                    break;
+                case RtlSdrOpenResult::Disconnected:
+                    set_state(RadioSessionState::Missing,
+                              error,
+                              available_devices.front().name);
+                    break;
+                case RtlSdrOpenResult::Failed:
+                case RtlSdrOpenResult::Opened:
+                    set_state(RadioSessionState::Error,
+                              error,
+                              available_devices.front().name);
+                    break;
+            }
             if (wait_for_retry()) break;
             continue;
         }

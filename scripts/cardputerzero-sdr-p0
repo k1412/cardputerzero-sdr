@@ -87,6 +87,7 @@ fi
 sys_root=${ZERO_SDR_P0_SYS_ROOT:-/sys}
 dev_root=${ZERO_SDR_P0_DEV_ROOT:-/dev}
 proc_root=${ZERO_SDR_P0_PROC_ROOT:-/proc}
+fs_root=${ZERO_SDR_P0_ROOT:-}
 app_command=${ZERO_SDR_P0_APP:-cardputerzero-sdr}
 
 if [ -z "$output" ]; then
@@ -128,9 +129,17 @@ mode_text() {
 }
 
 os_value() {
-    [ -r "$sys_root/../etc/os-release" ] || return 0
+    [ -r "$fs_root/etc/os-release" ] || return 0
     awk -F= -v wanted="$1" '$1 == wanted {value=$0; sub(/^[^=]*=/, "", value); gsub(/^"|"$/, "", value); print value; exit}' \
-        "$sys_root/../etc/os-release"
+        "$fs_root/etc/os-release"
+}
+
+package_state() {
+    if command -v dpkg-query >/dev/null 2>&1; then
+        dpkg-query -W -f='${Status} ${Version} ${Architecture}' "$1" 2>/dev/null || printf 'not-installed'
+    else
+        printf 'dpkg-query-unavailable'
+    fi
 }
 
 app_path=$(command -v "$app_command" 2>/dev/null || true)
@@ -144,19 +153,46 @@ for required_tool in awk grep ps sed stat tr; do
 done
 
 {
-    echo "schema=zero-sdr-p0-v1"
+    echo "schema=zero-sdr-p0-v2"
     echo "created_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "kernel=$(uname -srmo 2>/dev/null || echo unavailable)"
     echo "os_id=$(os_value ID)"
     echo "os_version=$(os_value VERSION_ID)"
     echo "uid=$(id -u)"
     echo "gid=$(id -g)"
+    user_groups=$(id -Gn 2>/dev/null || true)
+    case " $user_groups " in
+        *" plugdev "*) echo "plugdev_membership=present" ;;
+        *) echo "plugdev_membership=missing"; preflight_ok=0 ;;
+    esac
     echo "monitor_tools=$monitor_tools"
-    if command -v dpkg-query >/dev/null 2>&1; then
-        echo "package=$(dpkg-query -W -f='${Status} ${Version} ${Architecture}' cardputerzero-sdr 2>/dev/null || echo not-installed)"
-    else
-        echo "package=dpkg-query-unavailable"
+    package=$(package_state cardputerzero-sdr)
+    echo "package=$package"
+    case "$package" in
+        "install ok installed "*" arm64") ;;
+        *) preflight_ok=0 ;;
+    esac
+    rtl_runtime_package=$(package_state librtlsdr0)
+    echo "rtl_runtime_package=$rtl_runtime_package"
+    case "$rtl_runtime_package" in
+        "install ok installed "*" arm64"|"install ok installed "*" all") ;;
+        *) preflight_ok=0 ;;
+    esac
+
+    rtl_udev_rule="$fs_root/usr/lib/udev/rules.d/60-librtlsdr0.rules"
+    if [ ! -r "$rtl_udev_rule" ] && [ -r "$fs_root/lib/udev/rules.d/60-librtlsdr0.rules" ]; then
+        rtl_udev_rule="$fs_root/lib/udev/rules.d/60-librtlsdr0.rules"
     fi
+    rtl_udev_status=missing
+    if [ -r "$rtl_udev_rule" ]; then
+        rtl_udev_status=invalid
+        if grep -Eq 'ATTRS?\{idVendor\}=="0bda".*ATTRS?\{idProduct\}=="2832".*GROUP="plugdev"' "$rtl_udev_rule" &&
+           grep -Eq 'ATTRS?\{idVendor\}=="0bda".*ATTRS?\{idProduct\}=="2838".*GROUP="plugdev"' "$rtl_udev_rule"; then
+            rtl_udev_status=valid
+        fi
+    fi
+    echo "rtl_udev_rule=$rtl_udev_status path=$rtl_udev_rule"
+    [ "$rtl_udev_status" = valid ] || preflight_ok=0
     if [ -n "$app_path" ]; then
         echo "app_path=$app_path"
         if command -v sha256sum >/dev/null 2>&1; then
@@ -202,6 +238,7 @@ done
 
     rtl_count=0
     rtl_accessible=0
+    rtl_high_speed=0
     for usb_path in "$sys_root"/bus/usb/devices/*; do
         [ -r "$usb_path/idVendor" ] && [ -r "$usb_path/idProduct" ] || continue
         vendor=$(read_trimmed "$usb_path/idVendor")
@@ -220,12 +257,19 @@ done
         if [ -L "$usb_path/driver" ]; then
             usb_driver=$(basename "$(readlink "$usb_path/driver")")
         fi
-        echo "rtl_usb=$vendor:$product bus=$busnum device=$devnum access=$(access_text "$usb_node") mode=$(mode_text "$usb_node") driver=$usb_driver speed=$(read_trimmed "$usb_path/speed") max_power=$(read_trimmed "$usb_path/bMaxPower") runtime=$(read_trimmed "$usb_path/power/runtime_status")"
+        usb_speed=$(read_trimmed "$usb_path/speed")
+        echo "rtl_usb=$vendor:$product bus=$busnum device=$devnum access=$(access_text "$usb_node") mode=$(mode_text "$usb_node") driver=$usb_driver speed=$usb_speed max_power=$(read_trimmed "$usb_path/bMaxPower") runtime=$(read_trimmed "$usb_path/power/runtime_status")"
         rtl_count=$((rtl_count + 1))
-        [ -r "$usb_node" ] && [ -w "$usb_node" ] && rtl_accessible=$((rtl_accessible + 1))
+        if [ -r "$usb_node" ] && [ -w "$usb_node" ]; then
+            rtl_accessible=$((rtl_accessible + 1))
+            if is_uint "$usb_speed" && [ "$usb_speed" -ge 480 ]; then
+                rtl_high_speed=$((rtl_high_speed + 1))
+            fi
+        fi
     done
-    echo "rtl_devices=$rtl_count accessible=$rtl_accessible"
+    echo "rtl_devices=$rtl_count accessible=$rtl_accessible high_speed=$rtl_high_speed"
     [ "$rtl_accessible" -gt 0 ] || preflight_ok=0
+    [ "$rtl_high_speed" -gt 0 ] || preflight_ok=0
 
     if [ -s "$proc_root/asound/cards" ]; then
         echo "alsa_cards=present"

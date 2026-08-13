@@ -4,8 +4,22 @@
 
 #include <array>
 #include <cassert>
+#include <cstdlib>
 #include <cstdint>
 #include <string>
+
+namespace {
+
+void set_fake_open_result(const char* value) {
+#if defined(_WIN32)
+    _putenv_s("ZERO_SDR_FAKE_OPEN_RESULT", value ? value : "");
+#else
+    if (value) setenv("ZERO_SDR_FAKE_OPEN_RESULT", value, 1);
+    else unsetenv("ZERO_SDR_FAKE_OPEN_RESULT");
+#endif
+}
+
+} // namespace
 
 int main(int argc, char** argv) {
     assert(argc == 2);
@@ -27,9 +41,19 @@ int main(int argc, char** argv) {
     assert(devices[0].serial == "TEST0001");
 
     std::string error;
-    assert(!radio.open(1, error));
+    assert(radio.open(1, error) == device::RtlSdrOpenResult::Failed);
     assert(!error.empty());
-    assert(radio.open(0, error));
+    set_fake_open_result("-3");
+    assert(radio.open(0, error) == device::RtlSdrOpenResult::AccessDenied);
+    assert(error.find("access denied") != std::string::npos);
+    set_fake_open_result("-6");
+    assert(radio.open(0, error) == device::RtlSdrOpenResult::Busy);
+    assert(error.find("busy") != std::string::npos);
+    set_fake_open_result("-4");
+    assert(radio.open(0, error) == device::RtlSdrOpenResult::Disconnected);
+    assert(error.find("disconnected") != std::string::npos);
+    set_fake_open_result(nullptr);
+    assert(radio.open(0, error) == device::RtlSdrOpenResult::Opened);
     assert(radio.is_open());
     const auto gains = radio.tuner_gains(error);
     assert((gains == std::vector<int>{-99, -40, 71, 179, 192}));

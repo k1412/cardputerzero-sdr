@@ -212,23 +212,36 @@ std::vector<RtlSdrInfo> RtlSdrDevice::devices() const {
     return result;
 }
 
-bool RtlSdrDevice::open(uint32_t index, std::string& error) {
+RtlSdrOpenResult RtlSdrDevice::open(uint32_t index, std::string& error) {
     close();
     if (!impl_->available) {
         error = impl_->error;
-        return false;
+        return RtlSdrOpenResult::Failed;
     }
     if (index >= impl_->get_device_count()) {
         error = "RTL-SDR device index is out of range";
-        return false;
+        return RtlSdrOpenResult::Failed;
     }
-    if (impl_->open_device(&impl_->device, index) != 0 || !impl_->device) {
+    const int result = impl_->open_device(&impl_->device, index);
+    if (result != 0 || !impl_->device) {
         impl_->device = nullptr;
-        error = "failed to open RTL-SDR device";
-        return false;
+        switch (result) {
+            case -3:
+                error = "RTL-SDR USB access denied";
+                return RtlSdrOpenResult::AccessDenied;
+            case -4:
+                error = "RTL-SDR USB device disconnected";
+                return RtlSdrOpenResult::Disconnected;
+            case -6:
+                error = "RTL-SDR USB device is busy";
+                return RtlSdrOpenResult::Busy;
+            default:
+                error = "failed to open RTL-SDR device";
+                return RtlSdrOpenResult::Failed;
+        }
     }
     error.clear();
-    return true;
+    return RtlSdrOpenResult::Opened;
 }
 
 void RtlSdrDevice::close() {

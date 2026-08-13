@@ -4,10 +4,29 @@
 
 #include <cassert>
 #include <chrono>
+#include <cstdlib>
 #include <string>
 #include <thread>
 
 namespace {
+
+void set_fake_open_result(const char* value) {
+#if defined(_WIN32)
+    _putenv_s("ZERO_SDR_FAKE_OPEN_RESULT", value ? value : "");
+#else
+    if (value) setenv("ZERO_SDR_FAKE_OPEN_RESULT", value, 1);
+    else unsetenv("ZERO_SDR_FAKE_OPEN_RESULT");
+#endif
+}
+
+bool wait_for_state(device::RadioSession& session, device::RadioSessionState expected) {
+    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (session.state() == expected) return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    return false;
+}
 
 bool wait_for_live_frame(device::RadioSession& session,
                          dsp::SpectrumFrame& frame,
@@ -69,6 +88,23 @@ int main(int argc, char** argv) {
     assert(!session.started());
     assert(session.state() == device::RadioSessionState::Stopped);
     assert(!session.audio_active());
+
+    set_fake_open_result("-3");
+    device::RadioSession access_denied_session(argv[1], argv[2], "fake");
+    access_denied_session.start();
+    assert(wait_for_state(access_denied_session, device::RadioSessionState::AccessDenied));
+    assert(access_denied_session.status_detail().find("access denied") != std::string::npos);
+    assert(access_denied_session.metrics().successful_connections == 0);
+    access_denied_session.stop();
+
+    set_fake_open_result("-6");
+    device::RadioSession busy_session(argv[1], argv[2], "fake");
+    busy_session.start();
+    assert(wait_for_state(busy_session, device::RadioSessionState::Busy));
+    assert(busy_session.status_detail().find("busy") != std::string::npos);
+    assert(busy_session.metrics().successful_connections == 0);
+    busy_session.stop();
+    set_fake_open_result(nullptr);
 
     // Missing ALSA must not prevent live RF and spectrum operation.
     device::RadioSession no_audio_session(argv[1], "/not/a/real/libasound.so", "fake");

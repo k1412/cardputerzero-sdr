@@ -15,6 +15,11 @@ def write(path: Path, value: str) -> None:
     path.write_text(value, encoding="utf-8")
 
 
+def write_executable(path: Path, value: str) -> None:
+    write(path, value)
+    path.chmod(0o755)
+
+
 def main() -> int:
     assert len(sys.argv) == 2
     tool = sys.argv[1]
@@ -24,7 +29,38 @@ def main() -> int:
         dev_root = root / "dev"
         proc_root = root / "proc"
         output = root / "evidence"
+        fake_bin = root / "bin"
 
+        write_executable(
+            fake_bin / "id",
+            """#!/bin/sh
+case "${1:-}" in
+    -u) echo 1000 ;;
+    -g) echo 1000 ;;
+    -Gn) echo "${FAKE_ID_GROUPS:-wuyang audio input plugdev video}" ;;
+    *) exit 2 ;;
+esac
+""",
+        )
+        write_executable(
+            fake_bin / "dpkg-query",
+            """#!/bin/sh
+package=""
+for package do :; done
+case "$package" in
+    cardputerzero-sdr)
+        printf 'install ok installed 0.1.0-3 arm64'
+        ;;
+    librtlsdr0)
+        [ "${FAKE_RTL_PACKAGE_MISSING:-0}" = 0 ] || exit 1
+        printf 'install ok installed 2.0.2-2+b1 arm64'
+        ;;
+    *) exit 1 ;;
+esac
+""",
+        )
+
+        write(root / "etc/os-release", 'ID=debian\nVERSION_ID="13"\n')
         write(sys_root / "class/graphics/fb0/name", "fake-fb\n")
         write(sys_root / "class/graphics/fb0/virtual_size", "320,170\n")
         write(sys_root / "class/graphics/fb0/bits_per_pixel", "16\n")
@@ -45,6 +81,14 @@ def main() -> int:
         write(usb / "power/runtime_status", "active\n")
         write(usb / "serial", "SECRET-SERIAL-MUST-NOT-LEAK\n")
         write(dev_root / "bus/usb/001/002", "")
+        udev_rule = root / "usr/lib/udev/rules.d/60-librtlsdr0.rules"
+        udev_rule_text = (
+            'SUBSYSTEMS=="usb", ATTRS{idVendor}=="0bda", '
+            'ATTRS{idProduct}=="2832", MODE="0660", GROUP="plugdev"\n'
+            'SUBSYSTEMS=="usb", ATTRS{idVendor}=="0bda", '
+            'ATTRS{idProduct}=="2838", MODE="0660", GROUP="plugdev"\n'
+        )
+        write(udev_rule, udev_rule_text)
         write(proc_root / "asound/cards", " 0 [Fake]: Fake Audio\n")
         write(proc_root / "asound/pcm", "00-00: Fake PCM : playback 1\n")
         write(dev_root / "snd/pcmC0D0p", "")
@@ -58,6 +102,8 @@ def main() -> int:
         environment.pop("LV_LINUX_KEYBOARD_DEVICE", None)
         environment.pop("APPLAUNCH_LINUX_KEYBOARD_DEVICE", None)
         environment.update({
+            "PATH": str(fake_bin) + os.pathsep + environment["PATH"],
+            "ZERO_SDR_P0_ROOT": str(root),
             "ZERO_SDR_P0_SYS_ROOT": str(sys_root),
             "ZERO_SDR_P0_DEV_ROOT": str(dev_root),
             "ZERO_SDR_P0_PROC_ROOT": str(proc_root),
@@ -72,11 +118,18 @@ def main() -> int:
         )
         assert result.returncode == 0, result.stdout + result.stderr
         report = (output / "preflight.txt").read_text(encoding="utf-8")
+        assert "schema=zero-sdr-p0-v2" in report
         assert "preflight=PASS" in report
+        assert "os_id=debian" in report
+        assert "os_version=13" in report
+        assert "plugdev_membership=present" in report
+        assert "package=install ok installed 0.1.0-3 arm64" in report
+        assert "rtl_runtime_package=install ok installed 2.0.2-2+b1 arm64" in report
+        assert f"rtl_udev_rule=valid path={udev_rule}" in report
         assert "framebuffer_virtual_size=320,170" in report
         assert "input_events=1 readable=1" in report
         assert f"preferred_keyboard={preferred_keyboard} access=read-write" in report
-        assert "rtl_devices=1 accessible=1" in report
+        assert "rtl_devices=1 accessible=1 high_speed=1" in report
         assert "rtl_usb=0bda:2832" in report
         assert "alsa_playback_nodes=1 accessible=1" in report
         assert "SECRET-SERIAL-MUST-NOT-LEAK" not in report
@@ -123,6 +176,74 @@ def main() -> int:
         assert f"framebuffer={dev_root / 'fb0'} access=read-write" in lv_precedence_report
         assert "framebuffer_name=fake-fb" in lv_precedence_report
         assert "framebuffer_name=redirected-fb" not in lv_precedence_report
+
+        missing_dependency_environment = dict(environment)
+        missing_dependency_environment["FAKE_RTL_PACKAGE_MISSING"] = "1"
+        missing_dependency_output = root / "missing-dependency-evidence"
+        result = subprocess.run(
+            [tool, "--preflight-only", "--output", str(missing_dependency_output)],
+            env=missing_dependency_environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        missing_dependency_report = (
+            missing_dependency_output / "preflight.txt"
+        ).read_text(encoding="utf-8")
+        assert "rtl_runtime_package=not-installed" in missing_dependency_report
+        assert "preflight=FAIL" in missing_dependency_report
+
+        missing_group_environment = dict(environment)
+        missing_group_environment["FAKE_ID_GROUPS"] = "wuyang audio input video"
+        missing_group_output = root / "missing-group-evidence"
+        result = subprocess.run(
+            [tool, "--preflight-only", "--output", str(missing_group_output)],
+            env=missing_group_environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        missing_group_report = (
+            missing_group_output / "preflight.txt"
+        ).read_text(encoding="utf-8")
+        assert "plugdev_membership=missing" in missing_group_report
+        assert "preflight=FAIL" in missing_group_report
+
+        udev_rule.unlink()
+        missing_rule_output = root / "missing-rule-evidence"
+        result = subprocess.run(
+            [tool, "--preflight-only", "--output", str(missing_rule_output)],
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        missing_rule_report = (
+            missing_rule_output / "preflight.txt"
+        ).read_text(encoding="utf-8")
+        assert "rtl_udev_rule=missing" in missing_rule_report
+        assert "preflight=FAIL" in missing_rule_report
+        write(udev_rule, udev_rule_text)
+
+        write(usb / "speed", "12\n")
+        low_speed_output = root / "low-speed-evidence"
+        result = subprocess.run(
+            [tool, "--preflight-only", "--output", str(low_speed_output)],
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        low_speed_report = (
+            low_speed_output / "preflight.txt"
+        ).read_text(encoding="utf-8")
+        assert "rtl_devices=1 accessible=1 high_speed=0" in low_speed_report
+        assert "preflight=FAIL" in low_speed_report
+        write(usb / "speed", "480\n")
 
         short_output = root / "short-evidence"
         result = subprocess.run(

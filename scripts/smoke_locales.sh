@@ -12,7 +12,7 @@ trap 'rm -rf -- "$config_root"' EXIT
 mkdir -p "$output_dir"
 
 for locale in "${locales[@]}"; do
-  for page in radio settings direct-tune no-audio-radio no-audio-settings; do
+  for page in radio settings direct-tune no-audio-radio no-audio-settings usb-access-radio; do
     page_env=()
     if [[ "$page" == "settings" ]]; then
       page_env=(ZERO_SDR_START_PAGE=settings)
@@ -27,6 +27,10 @@ for locale in "${locales[@]}"; do
                 ZERO_SDR_START_PAGE=settings
                 ZERO_SDR_RTLSDR_LIBRARY="$fake_rtlsdr"
                 ZERO_SDR_ALSA_LIBRARY="$output_dir/missing-libasound.so")
+    elif [[ "$page" == "usb-access-radio" ]]; then
+      page_env=(ZERO_SDR_LIVE=1
+                ZERO_SDR_RTLSDR_LIBRARY="$fake_rtlsdr"
+                ZERO_SDR_FAKE_OPEN_RESULT=-3)
     fi
     env SDL_VIDEODRIVER=dummy \
       XDG_CONFIG_HOME="$config_root/$locale-$page" \

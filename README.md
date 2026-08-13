@@ -87,15 +87,15 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 ./build/linux-x86-64/Debug/cardputerzero-sdr
 ```
 
-Run 50 screenshot checks—radio, settings, direct tuning, and both radio/settings audio-failure states in all ten locales—with `scripts/smoke_locales.sh`. To capture only the direct-tuning overlay, start on the radio page and set `ZERO_SDR_DIRECT_ENTRY=103.9`.
+Run 60 screenshot checks—radio, settings, direct tuning, both radio/settings audio-failure states, and USB-access recovery in all ten locales—with `scripts/smoke_locales.sh`. To capture only the direct-tuning overlay, start on the radio page and set `ZERO_SDR_DIRECT_ENTRY=103.9`.
 
-Generate six reproducible receiver states—offline demo, fake-device `LIVE`, device-reported manual gain, `NO AUDIO`, direct tuning, and `NO DEVICE`—with `scripts/capture_demo_states.sh`.
+Generate eight reproducible receiver states—offline demo, fake-device `LIVE`, device-reported manual gain, `NO AUDIO`, direct tuning, `NO DEVICE`, USB access denied, and device busy—with `scripts/capture_demo_states.sh`.
 
 ## Runtime diagnostics
 
 The app writes one structured `diagnostics` record to standard output every 30 seconds. Each record contains cumulative connection/retry/read-error counts, IQ blocks and bytes, audio generated/written/dropped frames, ALSA recovery/failure counts, DSP processing time, UI-loop count, and maximum UI-loop gap. Set `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` to a value from 100 to 3,600,000 when a different interval is needed.
 
-The ARM64 package installs `cardputerzero-sdr-p0`, a non-root preflight and evidence runner. Do not launch a second Zero SDR instance from APPLaunch at the same time. From an SSH or local shell as the normal APPLaunch user, first verify native 320×170 framebuffer access, the official APPLaunch/Cardputer keyboard path, RTL-SDR USB-node access, and a writable ALSA playback node:
+The ARM64 package installs `cardputerzero-sdr-p0`, a non-root preflight and evidence runner. Do not launch a second Zero SDR instance from APPLaunch at the same time. From an SSH or local shell as the normal APPLaunch user, first verify the installed ARM64 app and `librtlsdr0` packages, `plugdev` membership, the distribution-owned RTL-SDR rule, a USB high-speed link, native 320×170 framebuffer access, the official APPLaunch/Cardputer keyboard path, RTL-SDR USB-node access, and a writable ALSA playback node:
 
 ```sh
 cardputerzero-sdr-p0 --preflight-only
@@ -127,7 +127,7 @@ The cross preset follows the official CardputerZero CMake template and downloads
 cmake --workflow --preset cp0-cross-package
 ```
 
-Expected package name: `dist/cardputerzero-sdr_0.1.0-2_arm64.deb`.
+Expected package name: `dist/cardputerzero-sdr_0.1.0-3_arm64.deb`.
 
 Do not treat a successful cross-build as device validation. Complete [the hardware test plan](docs/DEVICE_TEST_PLAN.md) before publishing a release.
 

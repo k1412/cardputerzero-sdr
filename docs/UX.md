@@ -27,9 +27,11 @@ Long device states use ellipsis. Settings values have a fixed right-aligned colu
 - Esc from settings returns to radio; Esc from radio exits to the launcher.
 - Linux `EV_KEY=2` repeats are ignored for Enter/Esc, step selection, direct entry, and G/M/L/T toggles so a held key cannot oscillate pages or values.
 - Missing hardware must show `NO DEVICE` while keeping settings and demo behavior usable.
+- USB permission failure must show a localized access state and replug guidance so a stale pre-install device node can recover after the Store installs `librtlsdr0`.
+- A device claimed by another process must show a localized busy state and tell the user to close the other SDR application.
 - Audio initialization or playback failure must show `NO AUDIO` while preserving live RF, spectrum, settings, and keyboard control.
 - USB or DSP failure must not freeze input or leave loud/stale audio playing.
 
 ## Accessibility and localization
 
-The dark palette maintains high contrast and reserves amber/red for mode and warning states. Meaning is not conveyed by color alone: `DEMO`, `LIVE`, mute, `NO AUDIO`, and device errors are textual. Locale-specific fonts are bundled so CJK and Cyrillic rendering does not depend on the system image.
+The dark palette maintains high contrast and reserves amber/red for mode and warning states. Meaning is not conveyed by color alone: `DEMO`, `LIVE`, mute, `NO AUDIO`, USB-access recovery, device-busy recovery, and device errors are textual. Locale-specific fonts are bundled so CJK and Cyrillic rendering does not depend on the system image.

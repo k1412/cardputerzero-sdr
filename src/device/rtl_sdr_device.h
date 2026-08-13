@@ -18,6 +18,14 @@ struct RtlSdrInfo {
     std::string serial;
 };
 
+enum class RtlSdrOpenResult : uint8_t {
+    Opened = 0,
+    AccessDenied,
+    Busy,
+    Disconnected,
+    Failed,
+};
+
 class RtlSdrDevice {
 public:
     // An empty path searches the platform's standard librtlsdr names.
@@ -31,7 +39,7 @@ public:
     const std::string& library_error() const;
     std::vector<RtlSdrInfo> devices() const;
 
-    bool open(uint32_t index, std::string& error);
+    RtlSdrOpenResult open(uint32_t index, std::string& error);
     void close();
     bool is_open() const;
     std::vector<int> tuner_gains(std::string& error) const;

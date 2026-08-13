@@ -22,7 +22,7 @@ This establishes the dongle baseline only. It does not prove Cardputer Zero USB-
 | Install | Install release `.deb`, launch from APPLaunch | correct icon/title; clean start/exit | Pending device |
 | Display | Inspect radio/settings in dark and light themes; repeat once with the framebuffer path exported by APPLaunch | selected path and native 320×170 mode are logged; no clipping, tearing, overlays, or unreadable text | Pending device |
 | Keys | Exercise F/X/Z/C, Enter, Esc, G/M/L/T, number row, period, Backspace, and hold-to-repeat | one action per press; repeat is controlled; Esc returns safely | Pending device |
-| USB discovery | Cold boot, hot-plug, unplug/replug RTL2832U | state changes without crash; UI stays responsive | Pending device |
+| USB discovery | Cold boot, hot-plug, unplug/replug RTL2832U | installed `librtlsdr0`, valid distro rule, `plugdev` membership, at least 480 Mb/s link, and read-write node; state changes without crash; UI stays responsive | Pending device |
 | USB power | Capture continuously with screen/audio active | no brownout, disconnect loop, or thermal warning | Pending device |
 | Tuning | Test 22.0, 97.4, and 948.6 MHz by stepping and direct entry; try 21.999/948.601 | valid values tune exactly; invalid values are rejected; no overflow/wrap | Pending device |
 | RF capture | Run 2.048 MS/s for 30 minutes and summarize the structured log | no read errors/reconnects; IQ throughput within 10% of 4,096,000 bytes/s | Pending device |
@@ -35,7 +35,9 @@ This establishes the dongle baseline only. It does not prove Cardputer Zero USB-
 
 - Start with no dongle.
 - Remove the dongle during a USB read.
-- Deny access to the USB device and input event node.
+- Deny access to the USB device: the localized access state must appear with replug guidance, live audio must remain stopped, and the app must recover without restart after access is restored.
+- Claim the dongle from another SDR process: the localized busy state must appear with close-other-SDR guidance, then recover after that process exits.
+- Deny access to the input event node.
 - Supply a malformed config file.
 - Fill or make the user config directory read-only.
 - Force the SDR worker behind real time and verify bounded frame dropping.
@@ -49,7 +51,7 @@ Run this separately from hot-plug and failure-injection tests so intentional rec
 cardputerzero-sdr-p0 --preflight-only
 ```
 
-The preflight must report `preflight=PASS`; inspect its framebuffer, input-event, RTL-SDR node, and ALSA facts rather than bypassing a failure with root. Keep audio unmuted on a known WFM station, then start the evidence run and exercise the physical controls while it remains active:
+The preflight must report `schema=zero-sdr-p0-v2` and `preflight=PASS`. Confirm `plugdev_membership=present`, both package records are installed ARM64 builds, `rtl_udev_rule=valid`, and at least one accessible RTL-SDR reports `high_speed=1`; then inspect its framebuffer, input-event, USB-node, and ALSA facts rather than bypassing a failure with root. Keep audio unmuted on a known WFM station, then start the evidence run and exercise the physical controls while it remains active:
 
 ```sh
 cardputerzero-sdr-p0 --duration 1800

@@ -12,7 +12,7 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Deterministic offline spectrum demo
 - Ten-language catalog with bundled CJK/Cyrillic font subsets
 - Desktop screenshot automation and model/DSP/i18n tests
-- Reproducible demo-state capture for offline, fake-live, manual-gain, direct-entry, missing-device, and audio-failure UX
+- Reproducible demo-state capture for offline, fake-live, manual-gain, direct-entry, missing-device, audio-failure, USB-access, and device-busy UX
 - CardputerZero Store manifest, icon, screenshots, and release gates
 - Runtime-loaded RTL-SDR device session with reconnect, live IQ spectrum, channel-filtered/DC-blocked WFM mono demodulation, stereo-pilot alias rejection, and bounded ALSA output
 - Atomic persistence for frequency, tuning step, gain, mute, theme, and language with strict range validation
@@ -31,6 +31,8 @@ All notable changes will be documented here. The project follows Semantic Versio
 - SHA-256 verification for downloaded and cached copies of the official v0.0.4 Cardputer Zero BSP
 - Store-compliant packaging with no application-owned system udev rule or maintainer scripts
 - Device-package CI enforcement of the pinned authoritative Store install-path and archive-safety policy
+- P0 package, `plugdev`, distro-udev, and USB high-speed gates with privacy-preserving evidence
+- Localized USB-access recovery and device-busy guidance instead of a generic hardware error
 
 ### Known limitations
 

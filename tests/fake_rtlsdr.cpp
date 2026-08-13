@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 #include <algorithm>
+#include <cstdlib>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
@@ -34,6 +35,10 @@ int rtlsdr_get_device_usb_strings(uint32_t index, char* manufacturer, char* prod
 
 int rtlsdr_open(rtlsdr_dev** output, uint32_t index) {
     if (!output || index != 0) return -1;
+    if (const char* forced_result = std::getenv("ZERO_SDR_FAKE_OPEN_RESULT")) {
+        const int result = std::atoi(forced_result);
+        if (result != 0) return result;
+    }
     *output = new rtlsdr_dev{};
     return 0;
 }

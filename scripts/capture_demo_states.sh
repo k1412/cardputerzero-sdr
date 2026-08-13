@@ -44,6 +44,12 @@ capture live-no-audio env ZERO_SDR_LIVE=1 \
 capture no-device env ZERO_SDR_LIVE=1 \
   ZERO_SDR_RTLSDR_LIBRARY="$output_dir/missing-librtlsdr.so" \
   ZERO_SDR_ALSA_LIBRARY="$fake_asound"
+capture usb-access env ZERO_SDR_LIVE=1 \
+  ZERO_SDR_RTLSDR_LIBRARY="$fake_rtlsdr" \
+  ZERO_SDR_FAKE_OPEN_RESULT=-3
+capture device-busy env ZERO_SDR_LIVE=1 \
+  ZERO_SDR_RTLSDR_LIBRARY="$fake_rtlsdr" \
+  ZERO_SDR_FAKE_OPEN_RESULT=-6
 
 grep -Eq 'diagnostics .*ui_loops=[0-9]+ .*iq_blocks=[1-9][0-9]* .*total_processing_us=[1-9][0-9]*' \
   "$output_dir/live.log"
