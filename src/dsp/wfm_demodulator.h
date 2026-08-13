@@ -31,6 +31,7 @@ private:
     float previous_q_{0.0F};
     float discriminator_sum_{0.0F};
     float deemphasis_state_{0.0F};
+    float dc_estimate_{0.0F};
     uint32_t audio_decimation_phase_{0};
     bool has_previous_{false};
 };

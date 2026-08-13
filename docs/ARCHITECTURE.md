@@ -45,7 +45,7 @@ WfmDemodulator           // channel filter, FM discriminator, 32 kHz mono PCM
 AlsaAudioSink            // bounded PCM queue and mute control
 ```
 
-The receiver worker must never call LVGL. It publishes bounded frames to the main thread, drops stale visualization frames under load, and preserves audio continuity ahead of waterfall refresh rate. The WFM path uses a 100 kHz complex FIR before 4× RF decimation, then performs FM discrimination and a second 16× audio decimation; this rejects much of the 2.048 MHz capture outside the selected broadcast channel without a large intermediate buffer.
+The receiver worker must never call LVGL. It publishes bounded frames to the main thread, drops stale visualization frames under load, and preserves audio continuity ahead of waterfall refresh rate. The WFM path uses a 100 kHz complex FIR before 4× RF decimation, then performs FM discrimination and a second 16× audio decimation; this rejects much of the 2.048 MHz capture outside the selected broadcast channel without a large intermediate buffer. A 30 Hz DC blocker removes tuner/crystal offset after de-emphasis before PCM conversion.
 
 ## Threading and memory rules
 

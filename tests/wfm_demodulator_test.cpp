@@ -13,6 +13,7 @@ int main() {
     constexpr float pi = 3.14159265358979323846F;
     constexpr float audio_frequency_hz = 1'000.0F;
     constexpr float deviation_hz = 50'000.0F;
+    constexpr float carrier_offset_hz = 12'000.0F;
     constexpr float duration_seconds = 0.1F;
     const size_t sample_count = static_cast<size_t>(dsp::WfmDemodulator::kInputSampleRateHz * duration_seconds);
     std::vector<uint8_t> iq(sample_count * 2);
@@ -20,7 +21,8 @@ int main() {
     for (size_t sample = 0; sample < sample_count; ++sample) {
         const float time = static_cast<float>(sample) /
                            static_cast<float>(dsp::WfmDemodulator::kInputSampleRateHz);
-        const float instantaneous_frequency = deviation_hz * std::sin(2.0F * pi * audio_frequency_hz * time);
+        const float instantaneous_frequency = carrier_offset_hz +
+                                              deviation_hz * std::sin(2.0F * pi * audio_frequency_hz * time);
         phase += 2.0F * pi * instantaneous_frequency /
                  static_cast<float>(dsp::WfmDemodulator::kInputSampleRateHz);
         iq[sample * 2] = static_cast<uint8_t>(std::lround(127.5F + 100.0F * std::cos(phase)));
@@ -39,6 +41,11 @@ int main() {
     assert(*minimum < -5'000);
     assert(*maximum > 5'000);
 
+    int64_t sample_sum = 0;
+    for (auto current = range_begin; current != audio.end(); ++current) sample_sum += *current;
+    const auto mean = sample_sum / static_cast<int64_t>(audio.end() - range_begin);
+    assert(std::abs(mean) < 400);
+
     size_t positive_crossings = 0;
     for (auto current = range_begin + 1; current != audio.end(); ++current) {
         if (*(current - 1) <= 0 && *current > 0) ++positive_crossings;
@@ -54,7 +61,7 @@ int main() {
     for (size_t sample = 0; sample < sample_count; ++sample) {
         const float time = static_cast<float>(sample) /
                            static_cast<float>(dsp::WfmDemodulator::kInputSampleRateHz);
-        const float wanted_frequency = deviation_hz *
+        const float wanted_frequency = carrier_offset_hz + deviation_hz *
                                        std::sin(2.0F * pi * audio_frequency_hz * time);
         wanted_phase += 2.0F * pi * wanted_frequency /
                         static_cast<float>(dsp::WfmDemodulator::kInputSampleRateHz);

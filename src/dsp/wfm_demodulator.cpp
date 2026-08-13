@@ -19,6 +19,9 @@ constexpr float kRfCutoffHz = 100'000.0F;
 constexpr float kDeemphasisSeconds = 50.0e-6F;
 constexpr float kAudioPeriodSeconds = 1.0F / static_cast<float>(WfmDemodulator::kAudioSampleRateHz);
 constexpr float kDeemphasisAlpha = kAudioPeriodSeconds / (kDeemphasisSeconds + kAudioPeriodSeconds);
+constexpr float kDcBlockCutoffHz = 30.0F;
+const float kDcBlockAlpha = 1.0F - std::exp(
+    -2.0F * kPi * kDcBlockCutoffHz / static_cast<float>(WfmDemodulator::kAudioSampleRateHz));
 
 const std::array<float, 33>& rf_filter() {
     static const auto coefficients = [] {
@@ -92,7 +95,9 @@ std::vector<int16_t> WfmDemodulator::process(const uint8_t* iq_bytes, size_t byt
         discriminator_sum_ = 0.0F;
         const float normalized = std::clamp(average_phase / kMaximumPhaseStep, -1.0F, 1.0F);
         deemphasis_state_ += kDeemphasisAlpha * (normalized - deemphasis_state_);
-        const float scaled = std::clamp(deemphasis_state_ * 29'000.0F, -32'768.0F, 32'767.0F);
+        dc_estimate_ += kDcBlockAlpha * (deemphasis_state_ - dc_estimate_);
+        const float dc_blocked = deemphasis_state_ - dc_estimate_;
+        const float scaled = std::clamp(dc_blocked * 29'000.0F, -32'768.0F, 32'767.0F);
         audio.push_back(static_cast<int16_t>(std::lround(scaled)));
     }
     return audio;
@@ -107,6 +112,7 @@ void WfmDemodulator::reset() {
     previous_q_ = 0.0F;
     discriminator_sum_ = 0.0F;
     deemphasis_state_ = 0.0F;
+    dc_estimate_ = 0.0F;
     audio_decimation_phase_ = 0;
     has_previous_ = false;
 }
