@@ -20,12 +20,11 @@ Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. 
 - Automatic/manual gain state, mute state, dark/light theme
 - Ten UI languages: English, Simplified Chinese, Traditional Chinese, Spanish, Japanese, Korean, French, German, Brazilian Portuguese, and Russian
 - Linux/macOS/Windows desktop simulator support inherited from the official CardputerZero template
-- Unit tests for tuning boundaries, spectrum generation, and translation completeness
+- Host tests for tuning, FFT/WFM DSP, runtime-loaded RTL-SDR and ALSA boundaries, reconnect behavior, settings persistence, and translation completeness
 
 Not implemented or verified yet:
 
-- RTL-SDR USB capture on Cardputer Zero
-- WFM demodulation and speaker/headphone audio
+- RTL-SDR USB capture and audio on physical Cardputer Zero hardware
 - Persistence beyond theme selection
 - ARM64 `.deb` installation on real hardware
 - CardputerZero Store submission
@@ -111,4 +110,4 @@ The package name is `cardputerzero-sdr`. An existing Store app named `zerosdr` i
 
 ## License
 
-Source code is MIT licensed. Bundled fonts and icon-font assets have their own notices under `assets/fonts/`. The generated Zero SDR app icon is contributed to this project under the repository's MIT license.
+Application source code is MIT licensed. Device packages bundle librtlsdr 2.0.3 as a separate GPL-2.0-or-later shared library because it is absent from the current official BSP; its complete license is installed with the package. Bundled fonts and icon-font assets have their own notices under `assets/fonts/`. The generated Zero SDR app icon is contributed to this project under the repository's MIT license.

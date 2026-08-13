@@ -12,9 +12,10 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Ten-language catalog with bundled CJK/Cyrillic font subsets
 - Desktop screenshot automation and model/DSP/i18n tests
 - CardputerZero Store manifest, icon, screenshots, and release gates
+- Runtime-loaded RTL-SDR device session with reconnect, live IQ spectrum, WFM mono demodulation, and bounded ALSA output
 
 ### Known limitations
 
-- Live RTL-SDR capture and WFM audio are not implemented
+- Live RTL-SDR capture, channel-filtered WFM audio, and automatic reconnect are implemented but not yet verified on physical Cardputer Zero hardware
 - ARM64 package has not been installed on a physical Cardputer Zero
 - Locale selection is not persisted

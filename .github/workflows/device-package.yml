@@ -61,6 +61,11 @@ jobs:
           fi
           grep -q '/usr/bin/cardputerzero-sdr$' /tmp/package-contents.txt
           grep -q '/etc/cardputerzero-sdr.conf$' /tmp/package-contents.txt
+          grep -q '/usr/lib/cardputerzero-sdr/librtlsdr.so.2.0.3$' /tmp/package-contents.txt
+          grep -q '/usr/share/doc/cardputerzero-sdr/librtlsdr-GPL-2.0-or-later.txt$' /tmp/package-contents.txt
+          depends=$(dpkg-deb -f "$package" Depends)
+          grep -qw 'libasound2' <<<"$depends"
+          grep -qw 'libusb-1.0-0' <<<"$depends"
           dpkg-deb -I "$package"
 
       - name: Upload ARM64 package

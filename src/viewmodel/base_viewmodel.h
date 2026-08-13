@@ -10,6 +10,7 @@
 #include "radio_model.h"
 #include "synthetic_spectrum.h"
 #include "translations.h"
+#include "radio_session.h"
 
 #include "lvgl.h"
 
@@ -66,6 +67,8 @@ private:
 
     model::RadioModel model_;
     dsp::SyntheticSpectrum synthetic_spectrum_;
+    device::RadioSession radio_session_;
+    device::RadioSessionState published_session_state_{device::RadioSessionState::Stopped};
     reactive::StringSubject<48> title_subject_;
     reactive::StringSubject<32> frequency_subject_;
     reactive::StringSubject<32> source_subject_;

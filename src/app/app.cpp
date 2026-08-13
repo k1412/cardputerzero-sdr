@@ -56,9 +56,11 @@ void quit_requested_observer(lv_observer_t* observer, lv_subject_t* subject) {
     }
 }
 
-struct DarkModePersistence {
+struct SettingsPersistence {
     std::string config_path;
+    viewmodel::BaseViewModel* view_model;
     bool last_dark_mode;
+    int last_locale;
 };
 
 std::string writable_config_path() {
@@ -81,24 +83,29 @@ std::string writable_config_path() {
 #endif
 }
 
-void persist_dark_mode_observer(lv_observer_t* observer, lv_subject_t* subject) {
-    auto* persistence = static_cast<DarkModePersistence*>(lv_observer_get_user_data(observer));
+void persist_settings_observer(lv_observer_t* observer, lv_subject_t* subject) {
+    LV_UNUSED(subject);
+    auto* persistence = static_cast<SettingsPersistence*>(lv_observer_get_user_data(observer));
     if (!persistence) {
         return;
     }
-    const bool dark_mode = lv_subject_get_int(subject) != 0;
-    if (dark_mode == persistence->last_dark_mode) {
+    const bool dark_mode = persistence->view_model->is_dark_mode();
+    const int locale = static_cast<int>(persistence->view_model->locale());
+    if (dark_mode == persistence->last_dark_mode && locale == persistence->last_locale) {
         return;
     }
     persistence->last_dark_mode = dark_mode;
+    persistence->last_locale = locale;
 
     ApplicationConfig config;
     config.dark_mode = dark_mode;
+    config.locale = i18n::locale_info(persistence->view_model->locale()).code;
     std::string error;
     if (save_application_config(persistence->config_path, config, error)) {
-        LOG_INFO("saved config: {} (dark_mode={})",
+        LOG_INFO("saved config: {} (dark_mode={}, locale={})",
                  persistence->config_path,
-                 config.dark_mode ? "yes" : "no");
+                 config.dark_mode ? "yes" : "no",
+                 config.locale);
     } else {
         LOG_WARN("failed to save config {}: {}", persistence->config_path, error);
     }
@@ -163,9 +170,16 @@ int Application::run() {
     std::string config_error;
     if (load_application_config(loaded_config_path, config, config_error)) {
         view_model.set_dark_mode(config.dark_mode);
-        LOG_INFO("loaded config: {} (dark_mode={})",
+        for (const auto& locale : i18n::locales()) {
+            if (config.locale == locale.code) {
+                view_model.set_locale(locale.locale);
+                break;
+            }
+        }
+        LOG_INFO("loaded config: {} (dark_mode={}, locale={})",
                  loaded_config_path,
-                 config.dark_mode ? "yes" : "no");
+                 config.dark_mode ? "yes" : "no",
+                 config.locale);
     } else {
         LOG_WARN("failed to load config {}: {}; using defaults", loaded_config_path, config_error);
     }
@@ -206,10 +220,18 @@ int Application::run() {
     ScreenManager screen_manager(view_model, assets);
     screen_manager.start();
 
-    DarkModePersistence dark_mode_persistence{user_config_path, view_model.is_dark_mode()};
+    SettingsPersistence settings_persistence{
+        user_config_path,
+        &view_model,
+        view_model.is_dark_mode(),
+        static_cast<int>(view_model.locale()),
+    };
     auto* dark_mode_observer = lv_subject_add_observer(view_model.dark_mode_subject(),
-                                                        persist_dark_mode_observer,
-                                                        &dark_mode_persistence);
+                                                        persist_settings_observer,
+                                                        &settings_persistence);
+    auto* locale_observer = lv_subject_add_observer(view_model.locale_subject(),
+                                                     persist_settings_observer,
+                                                     &settings_persistence);
 
     bool running = true;
     auto* quit_observer = lv_subject_add_observer(view_model.quit_requested_subject(),
@@ -246,6 +268,9 @@ int Application::run() {
     }
     if (dark_mode_observer) {
         lv_observer_remove(dark_mode_observer);
+    }
+    if (locale_observer) {
+        lv_observer_remove(locale_observer);
     }
 
     return 0;

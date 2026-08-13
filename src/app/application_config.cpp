@@ -45,6 +45,17 @@ bool parse_bool(const std::string& value, bool& result) {
     return false;
 }
 
+bool parse_locale(const std::string& value, std::string& result) {
+    const auto normalized = trim(value);
+    if (normalized.empty() || normalized.size() > 16) return false;
+    const bool valid = std::all_of(normalized.begin(), normalized.end(), [](unsigned char character) {
+        return std::isalnum(character) || character == '-';
+    });
+    if (!valid) return false;
+    result = normalized;
+    return true;
+}
+
 bool is_section(const std::string& line, const std::string& expected) {
     const auto normalized = trim(line);
     return normalized.size() >= 2 && normalized.front() == '[' && normalized.back() == ']' &&
@@ -96,6 +107,12 @@ bool load_application_config(const std::string& path,
                 return false;
             }
         }
+        else if (section == "application" && key == "locale") {
+            if (!parse_locale(line.substr(separator + 1), config.locale)) {
+                error = "invalid locale value at line " + std::to_string(line_number);
+                return false;
+            }
+        }
     }
 
     return true;
@@ -128,7 +145,9 @@ bool save_application_config(const std::string& path,
     bool in_application_section = false;
     bool found_application_section = false;
     bool wrote_dark_mode = false;
+    bool wrote_locale = false;
     const std::string dark_mode_line = config.dark_mode ? "dark_mode=yes" : "dark_mode=no";
+    const std::string locale_line = "locale=" + config.locale;
 
     for (const auto& current_line : lines) {
         const auto normalized = trim(current_line);
@@ -139,6 +158,10 @@ bool save_application_config(const std::string& path,
                 updated.push_back(dark_mode_line);
                 wrote_dark_mode = true;
             }
+            if (in_application_section && !wrote_locale) {
+                updated.push_back(locale_line);
+                wrote_locale = true;
+            }
             in_application_section = is_section(current_line, "application");
             found_application_section = found_application_section || in_application_section;
         }
@@ -147,6 +170,13 @@ bool save_application_config(const std::string& path,
             if (!wrote_dark_mode) {
                 updated.push_back(dark_mode_line);
                 wrote_dark_mode = true;
+            }
+            continue;
+        }
+        if (in_application_section && is_key(current_line, "locale")) {
+            if (!wrote_locale) {
+                updated.push_back(locale_line);
+                wrote_locale = true;
             }
             continue;
         }
@@ -161,6 +191,9 @@ bool save_application_config(const std::string& path,
             updated.emplace_back("[application]");
         }
         updated.push_back(dark_mode_line);
+    }
+    if (!wrote_locale) {
+        updated.push_back(locale_line);
     }
 
     std::ofstream output(path, std::ios::trunc);

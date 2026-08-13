@@ -12,6 +12,7 @@ namespace app {
 
 struct ApplicationConfig {
     bool dark_mode = false;
+    std::string locale = "en";
 };
 
 bool load_application_config(const std::string& path,

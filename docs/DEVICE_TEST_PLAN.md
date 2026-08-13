@@ -22,12 +22,12 @@ This establishes the dongle baseline only. It does not prove Cardputer Zero USB-
 | Install | Install release `.deb`, launch from APPLaunch | correct icon/title; clean start/exit | Pending device |
 | Display | Inspect radio/settings in dark and light themes | no clipping, tearing, overlays, or unreadable text | Pending device |
 | Keys | Exercise F/X/Z/C, Enter, Esc, G/M/L/T and hold-to-repeat | one action per press; repeat is controlled; Esc returns safely | Pending device |
-| USB discovery | Cold boot, hot-plug, unplug/replug RTL2832U | state changes without crash; UI stays responsive | Pending implementation/device |
-| USB power | Capture continuously with screen/audio active | no brownout, disconnect loop, or thermal warning | Pending implementation/device |
-| Tuning | Test 22.0 MHz, 97.4 MHz, and 948.6 MHz boundaries | no overflow/wrap; device receives valid settings | Pending implementation/device |
-| RF capture | Run 2.048 MS/s for 30 minutes | no sustained overruns; reconnect path works | Pending implementation/device |
-| WFM audio | Receive a known station, mute/unmute, unplug device | intelligible audio; no loud transient; mute is immediate | Pending implementation/device |
-| Performance | Record CPU, memory, UI frame cadence, audio underruns | thresholds documented from real measurements | Pending implementation/device |
+| USB discovery | Cold boot, hot-plug, unplug/replug RTL2832U | state changes without crash; UI stays responsive | Pending device |
+| USB power | Capture continuously with screen/audio active | no brownout, disconnect loop, or thermal warning | Pending device |
+| Tuning | Test 22.0 MHz, 97.4 MHz, and 948.6 MHz boundaries | no overflow/wrap; device receives valid settings | Pending device |
+| RF capture | Run 2.048 MS/s for 30 minutes | no sustained overruns; reconnect path works | Pending device |
+| WFM audio | Receive a known station, mute/unmute, unplug device | intelligible audio; no loud transient; mute is immediate | Pending device |
+| Performance | Record CPU, memory, UI frame cadence, audio underruns | thresholds documented from real measurements | Pending device |
 | Locales | Open radio/settings in all ten languages | glyphs render; no clipping or crash | Pending device |
 | Persistence | Toggle theme, restart app | setting survives and app can recover from malformed config | Pending device |
 

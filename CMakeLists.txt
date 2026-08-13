@@ -27,6 +27,7 @@ set(APP_DRM_DEVICE "/dev/dri/card0" CACHE STRING "Linux DRM device path used whe
 set(APP_DRM_CONNECTOR_ID "-1" CACHE STRING "DRM connector id used when APP_USE_DRM=ON; -1 auto-selects")
 set(APP_USE_DRM OFF CACHE BOOL "Enable LVGL Linux DRM/KMS backend for embedded Linux builds")
 set(CM0_ALLOW_FETCH_DEPS ON CACHE BOOL "Allow downloading missing CM0 BSP/dependencies during cross builds")
+set(APP_BUNDLE_RTLSDR ON CACHE BOOL "Bundle a pinned librtlsdr runtime in Cardputer Zero packages")
 # Export compile commands
 # Used for IDE IntelliSense
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Export compile_commands.json" FORCE)
@@ -342,11 +343,15 @@ else()
 
     cm0_find_library(PTHREAD_LIBRARY pthread libpthread.so.0 libpthread.a)
     cm0_find_library(M_LIBRARY m libm.so libm.so.6 libm.a)
+    cm0_find_library(USB_LIBRARY usb-1.0 libusb-1.0.so.0)
     if(NOT PTHREAD_LIBRARY)
         message(FATAL_ERROR "Missing pthread library in BSP sysroot: ${CM0_SYSROOT}")
     endif()
     if(NOT M_LIBRARY)
         message(FATAL_ERROR "Missing math library in BSP sysroot: ${CM0_SYSROOT}")
+    endif()
+    if(APP_BUNDLE_RTLSDR AND NOT USB_LIBRARY)
+        message(FATAL_ERROR "Bundled RTL-SDR requires libusb-1.0 in BSP sysroot: ${CM0_SYSROOT}")
     endif()
 
     set(PLATFORM_INCLUDE_DIR ${CM0_MULTIARCH_INCLUDE_DIRS})
@@ -406,6 +411,65 @@ else()
 
 endif()
 
+# The official BSP includes libusb at runtime but not librtlsdr. Device
+# packages carry a pinned GPL shared library in an app-private directory.
+if(NOT USE_DESKTOP AND APP_BUNDLE_RTLSDR)
+    # CMake 3.x permits the explicit populate-only pattern below. CMake 4.x
+    # gates it behind CMP0169; using OLD here keeps third-party projects out of
+    # our build while retaining compatibility with the AppBuilder toolchain.
+    if(POLICY CMP0169)
+        cmake_policy(PUSH)
+        cmake_policy(SET CMP0169 OLD)
+    endif()
+    FetchContent_Declare(
+        rtlsdr_source
+        URL      https://github.com/osmocom/rtl-sdr/archive/refs/tags/v2.0.3.tar.gz
+        URL_HASH SHA256=23dec530f40456a8396e7c897f313859877e18b4c6432c6d323645871e351f6f
+        DOWNLOAD_EXTRACT_TIMESTAMP FALSE
+    )
+    FetchContent_Declare(
+        libusb_headers
+        URL      https://github.com/libusb/libusb/archive/refs/tags/v1.0.29.tar.gz
+        URL_HASH SHA256=7c2dd39c0b2589236e48c93247c986ae272e27570942b4163cb00a060fcf1b74
+        DOWNLOAD_EXTRACT_TIMESTAMP FALSE
+    )
+    FetchContent_GetProperties(rtlsdr_source)
+    if(NOT rtlsdr_source_POPULATED)
+        FetchContent_Populate(rtlsdr_source)
+    endif()
+    FetchContent_GetProperties(libusb_headers)
+    if(NOT libusb_headers_POPULATED)
+        FetchContent_Populate(libusb_headers)
+    endif()
+    if(POLICY CMP0169)
+        cmake_policy(POP)
+    endif()
+
+    add_library(bundled_rtlsdr SHARED
+        "${rtlsdr_source_SOURCE_DIR}/src/librtlsdr.c"
+        "${rtlsdr_source_SOURCE_DIR}/src/tuner_e4k.c"
+        "${rtlsdr_source_SOURCE_DIR}/src/tuner_fc0012.c"
+        "${rtlsdr_source_SOURCE_DIR}/src/tuner_fc0013.c"
+        "${rtlsdr_source_SOURCE_DIR}/src/tuner_fc2580.c"
+        "${rtlsdr_source_SOURCE_DIR}/src/tuner_r82xx.c"
+    )
+    target_include_directories(bundled_rtlsdr PRIVATE
+        "${rtlsdr_source_SOURCE_DIR}/include"
+        "${libusb_headers_SOURCE_DIR}/libusb"
+    )
+    target_compile_definitions(bundled_rtlsdr PRIVATE rtlsdr_EXPORTS DETACH_KERNEL_DRIVER=1)
+    target_compile_options(bundled_rtlsdr PRIVATE
+        -Wall -Wextra -Wno-unused-parameter -Wno-unused -Wno-sign-compare
+        -Wno-declaration-after-statement -fvisibility=hidden
+    )
+    target_link_libraries(bundled_rtlsdr PRIVATE "${USB_LIBRARY}" "${PTHREAD_LIBRARY}")
+    set_target_properties(bundled_rtlsdr PROPERTIES
+        OUTPUT_NAME rtlsdr
+        SOVERSION 0
+        VERSION 2.0.3
+    )
+endif()
+
 
 
 # ====================================================
@@ -442,6 +506,31 @@ target_link_libraries(${PROJECT_NAME}_platform
 )
 
 # ====================================================
+# Radio device sources (runtime-loaded; no hard librtlsdr link dependency)
+# ====================================================
+file(GLOB_RECURSE AUDIO_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/audio/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/audio/*.cpp"
+)
+
+add_library(${PROJECT_NAME}_audio STATIC ${AUDIO_SOURCES})
+target_include_directories(${PROJECT_NAME}_audio PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/audio"
+)
+target_link_libraries(${PROJECT_NAME}_audio PRIVATE ${CMAKE_DL_LIBS})
+
+file(GLOB_RECURSE DEVICE_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/device/*.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/device/*.cpp"
+)
+
+add_library(${PROJECT_NAME}_device STATIC ${DEVICE_SOURCES})
+target_include_directories(${PROJECT_NAME}_device PUBLIC
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/device"
+)
+target_link_libraries(${PROJECT_NAME}_device PRIVATE ${CMAKE_DL_LIBS})
+
+# ====================================================
 # Model sources
 # ====================================================
 file(GLOB_RECURSE MODEL_SOURCES CONFIGURE_DEPENDS
@@ -457,6 +546,8 @@ add_library(${PROJECT_NAME}_model
     STATIC
     ${MODEL_SOURCES}
 )
+
+target_link_libraries(${PROJECT_NAME}_device PUBLIC ${PROJECT_NAME}_model ${PROJECT_NAME}_audio)
 
 target_include_directories(${PROJECT_NAME}_model
     PUBLIC
@@ -520,6 +611,8 @@ target_link_libraries(${PROJECT_NAME}_view
         lvgl
         ${PROJECT_NAME}_reactive
         ${PROJECT_NAME}_platform
+        ${PROJECT_NAME}_device
+        ${PROJECT_NAME}_audio
 )
 
 # ====================================================
@@ -550,6 +643,7 @@ target_link_libraries(${PROJECT_NAME}_viewmodel
         ${PROJECT_NAME}_reactive
         ${PROJECT_NAME}_model
         ${PROJECT_NAME}_platform
+        ${PROJECT_NAME}_device
 )
 
 
@@ -648,6 +742,7 @@ add_executable(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
         ${PROJECT_NAME}_platform
+        ${PROJECT_NAME}_device
         ${PROJECT_NAME}_core
         ${PROJECT_NAME}_model
         ${PROJECT_NAME}_view
@@ -664,9 +759,46 @@ if(BUILD_TESTING AND NOT CMAKE_CROSSCOMPILING)
     target_link_libraries(synthetic_spectrum_test PRIVATE ${PROJECT_NAME}_model)
     add_test(NAME synthetic_spectrum COMMAND synthetic_spectrum_test)
 
+    add_executable(iq_spectrum_test tests/iq_spectrum_test.cpp)
+    target_link_libraries(iq_spectrum_test PRIVATE ${PROJECT_NAME}_model)
+    add_test(NAME iq_spectrum COMMAND iq_spectrum_test)
+
+    add_executable(wfm_demodulator_test tests/wfm_demodulator_test.cpp)
+    target_link_libraries(wfm_demodulator_test PRIVATE ${PROJECT_NAME}_model)
+    add_test(NAME wfm_demodulator COMMAND wfm_demodulator_test)
+
     add_executable(translations_test tests/translations_test.cpp)
     target_link_libraries(translations_test PRIVATE ${PROJECT_NAME}_model)
     add_test(NAME translations COMMAND translations_test)
+
+    add_executable(application_config_test
+        tests/application_config_test.cpp
+        src/app/application_config.cpp
+    )
+    target_include_directories(application_config_test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/src/app")
+    add_test(NAME application_config
+             COMMAND application_config_test "${CMAKE_CURRENT_BINARY_DIR}/application-config-test")
+
+    add_library(fake_rtlsdr SHARED tests/fake_rtlsdr.cpp)
+    set_target_properties(fake_rtlsdr PROPERTIES PREFIX "" OUTPUT_NAME "fake_rtlsdr")
+
+    add_library(fake_asound SHARED tests/fake_asound.cpp)
+    set_target_properties(fake_asound PROPERTIES PREFIX "" OUTPUT_NAME "fake_asound")
+
+    add_executable(alsa_audio_sink_test tests/alsa_audio_sink_test.cpp)
+    target_link_libraries(alsa_audio_sink_test PRIVATE ${PROJECT_NAME}_audio)
+    add_test(NAME alsa_audio_sink
+             COMMAND alsa_audio_sink_test $<TARGET_FILE:fake_asound>)
+
+    add_executable(rtl_sdr_device_test tests/rtl_sdr_device_test.cpp)
+    target_link_libraries(rtl_sdr_device_test PRIVATE ${PROJECT_NAME}_device)
+    add_test(NAME rtl_sdr_device
+             COMMAND rtl_sdr_device_test $<TARGET_FILE:fake_rtlsdr>)
+
+    add_executable(radio_session_test tests/radio_session_test.cpp)
+    target_link_libraries(radio_session_test PRIVATE ${PROJECT_NAME}_device)
+    add_test(NAME radio_session
+             COMMAND radio_session_test $<TARGET_FILE:fake_rtlsdr> $<TARGET_FILE:fake_asound>)
 endif()
 
 # Package deb

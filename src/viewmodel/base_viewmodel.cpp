@@ -8,6 +8,8 @@
 
 #include <array>
 #include <cstdio>
+#include <cstdlib>
+#include <string>
 
 namespace viewmodel {
 namespace {
@@ -16,10 +18,26 @@ int page_to_int(model::AppPage page) {
     return static_cast<int>(page);
 }
 
+std::string rtl_sdr_library_path() {
+    const char* path = std::getenv("ZERO_SDR_RTLSDR_LIBRARY");
+    return path ? path : "";
+}
+
+std::string audio_library_path() {
+    const char* path = std::getenv("ZERO_SDR_ALSA_LIBRARY");
+    return path ? path : "";
+}
+
+std::string audio_device_name() {
+    const char* name = std::getenv("ZERO_SDR_ALSA_DEVICE");
+    return name ? name : "default";
+}
+
 } // namespace
 
 BaseViewModel::BaseViewModel()
-    : title_subject_("Zero SDR"),
+    : radio_session_(rtl_sdr_library_path(), audio_library_path(), audio_device_name()),
+      title_subject_("Zero SDR"),
       frequency_subject_("97.400"),
       source_subject_("DEMO"),
       gain_subject_("AUTO GAIN"),
@@ -29,7 +47,19 @@ BaseViewModel::BaseViewModel()
       dark_mode_subject_(model_.dark_mode()),
       current_page_subject_(page_to_int(model_.current_page())),
       locale_subject_(static_cast<int>(model_.locale_index())),
-      quit_requested_subject_(false) {}
+      quit_requested_subject_(false) {
+    const bool force_demo = std::getenv("ZERO_SDR_DEMO") != nullptr;
+#if USE_DESKTOP
+    const bool enable_live = std::getenv("ZERO_SDR_LIVE") != nullptr;
+#else
+    const bool enable_live = true;
+#endif
+    if (enable_live && !force_demo) {
+        radio_session_.request_frequency(model_.frequency_hz());
+        radio_session_.request_gain(model_.automatic_gain(), model_.gain_tenths_db());
+        radio_session_.start();
+    }
+}
 
 BaseViewModel::~BaseViewModel() = default;
 
@@ -112,6 +142,7 @@ void BaseViewModel::toggle_page() {
 
 void BaseViewModel::tune(int direction) {
     model_.tune(direction);
+    radio_session_.request_frequency(model_.frequency_hz());
     publish_radio_state();
 }
 
@@ -122,16 +153,19 @@ void BaseViewModel::cycle_tuning_step(int direction) {
 
 void BaseViewModel::toggle_gain_mode() {
     model_.toggle_gain_mode();
+    radio_session_.request_gain(model_.automatic_gain(), model_.gain_tenths_db());
     publish_radio_state();
 }
 
 void BaseViewModel::adjust_gain(int direction) {
     model_.adjust_gain(direction);
+    radio_session_.request_gain(model_.automatic_gain(), model_.gain_tenths_db());
     publish_radio_state();
 }
 
 void BaseViewModel::toggle_muted() {
     model_.toggle_muted();
+    radio_session_.request_muted(model_.muted());
     publish_radio_state();
 }
 
@@ -172,6 +206,31 @@ const char* BaseViewModel::locale_font_asset() const {
 }
 
 dsp::SpectrumFrame BaseViewModel::next_spectrum_frame() {
+    if (radio_session_.started()) {
+        const auto session_state = radio_session_.state();
+        switch (session_state) {
+            case device::RadioSessionState::Stopped:
+            case device::RadioSessionState::Connecting:
+                model_.set_source_state(model::SourceState::Connecting);
+                break;
+            case device::RadioSessionState::Live:
+                model_.set_source_state(model::SourceState::Live);
+                break;
+            case device::RadioSessionState::Missing:
+                model_.set_source_state(model::SourceState::Missing);
+                break;
+            case device::RadioSessionState::Error:
+                model_.set_source_state(model::SourceState::Error);
+                break;
+        }
+        if (session_state != published_session_state_) {
+            published_session_state_ = session_state;
+            publish_radio_state();
+        }
+        dsp::SpectrumFrame live_frame;
+        if (radio_session_.latest_spectrum(live_frame)) return live_frame;
+        return {};
+    }
     return synthetic_spectrum_.next(model_.frequency_hz());
 }
 
