@@ -113,7 +113,7 @@ cardputerzero-sdr-p0 --duration 1800
 
 完整测试会先通过当前普通用户的 systemd 管理器暂停活动中的 `APPLaunch.service`，再启动 Zero SDR；测试完成、被中断或应用提前退出时都会恢复启动器。这样无需 root 即可遵循 APPLaunch 的帧缓冲独占约定，结果文件也会记录暂停和恢复状态。工具还会在发现已有 Zero SDR 进程时拒绝启动。
 
-工具会在 `$XDG_STATE_HOME/cardputerzero-sdr/evidence/`（或 `~/.local/state/`）下创建权限收紧的证据目录，保存经过隐私筛选的硬件/权限快照、`app.log`、进程 CPU/内存/温度采样、板载电池容量/电压/电流/温度采样和退出结果。它会拒绝 root 运行，不采集主机名、网络状态或 USB 序列号，并通过已经测试的 `SIGTERM` 正常清理路径停止应用。把证据目录复制到开发机上的项目仓库，再执行整体审计：
+工具会在 `$XDG_STATE_HOME/cardputerzero-sdr/evidence/`（或 `~/.local/state/`）下创建权限收紧的证据目录，保存经过隐私筛选的硬件/权限快照、`app.log`、进程 CPU/内存/温度采样、板载电池在位/状态/容量/电压/电流/温度采样和退出结果。它会拒绝 root 运行，不采集主机名、网络状态或 USB 序列号，并通过已经测试的 `SIGTERM` 正常清理路径停止应用。把证据目录复制到开发机上的项目仓库，再执行整体审计：
 
 ```sh
 python3 scripts/summarize_diagnostics.py --p0 path/to/evidence
@@ -129,7 +129,7 @@ python3 scripts/summarize_diagnostics.py --p0 path/to/evidence
 cmake --workflow --preset cp0-cross-package
 ```
 
-预期安装包：`dist/cardputerzero-sdr_0.1.0-8_arm64.deb`。
+预期安装包：`dist/cardputerzero-sdr_0.1.0-9_arm64.deb`。
 
 交叉编译成功不等同于实机验证。发布前必须完成[硬件测试计划](docs/DEVICE_TEST_PLAN.md)中的检查。
 

@@ -8,7 +8,7 @@ include(GNUInstallDirs)
 
 set(APP_DISPLAY_NAME "Zero SDR Keyboard" CACHE STRING "Human-readable application name used by launchers and Store metadata")
 set(APP_PACKAGE_NAME "cardputerzero-sdr" CACHE STRING "Debian package name")
-set(APP_DEBIAN_REVISION "8" CACHE STRING "Debian package revision/vendor suffix")
+set(APP_DEBIAN_REVISION "9" CACHE STRING "Debian package revision/vendor suffix")
 set(APP_DEBIAN_ARCHITECTURE "arm64" CACHE STRING "Debian package architecture")
 set(APP_MAINTAINER "k1412 <w.y.v@live.com>" CACHE STRING "Debian package maintainer")
 set(APP_PACKAGE_DESCRIPTION "Keyboard-first SDR spectrum and waterfall receiver for Cardputer Zero" CACHE STRING "Debian package summary")

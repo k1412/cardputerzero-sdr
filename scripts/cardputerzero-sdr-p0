@@ -439,7 +439,7 @@ fi
 resources="$output/resources.csv"
 app_log="$output/app.log"
 result="$output/result.txt"
-echo "epoch,pid,state,elapsed_s,cpu_percent,rss_kib,vsz_kib,mem_available_kib,max_temp_millic,battery_capacity_percent,battery_voltage_uv,battery_current_ua,battery_temp_tenths_c" >"$resources"
+echo "epoch,pid,state,elapsed_s,cpu_percent,rss_kib,vsz_kib,mem_available_kib,max_temp_millic,battery_present,battery_status,battery_capacity_percent,battery_voltage_uv,battery_current_ua,battery_temp_tenths_c" >"$resources"
 
 launcher_was_active=0
 launcher_stop_status=not-needed
@@ -501,11 +501,13 @@ while kill -0 "$app_pid" 2>/dev/null; do
             max_temp=$temp
         fi
     done
+    battery_present=$(read_trimmed "$battery_path/present")
+    battery_status=$(read_trimmed "$battery_path/status")
     battery_capacity=$(read_trimmed "$battery_path/capacity")
     battery_voltage=$(read_trimmed "$battery_path/voltage_now")
     battery_current=$(read_trimmed "$battery_current_path")
     battery_temp=$(read_trimmed "$battery_path/temp")
-    echo "$now,$app_pid,$process_values,${mem_available:-unknown},${max_temp:-unknown},${battery_capacity:-unknown},${battery_voltage:-unknown},${battery_current:-unknown},${battery_temp:-unknown}" >>"$resources"
+    echo "$now,$app_pid,$process_values,${mem_available:-unknown},${max_temp:-unknown},${battery_present:-unknown},${battery_status:-unknown},${battery_capacity:-unknown},${battery_voltage:-unknown},${battery_current:-unknown},${battery_temp:-unknown}" >>"$resources"
 
     if [ "$stop_requested" -eq 1 ]; then
         break
@@ -545,7 +547,7 @@ restore_launcher
 trap - 0
 
 {
-    echo "schema=zero-sdr-p0-result-v3"
+    echo "schema=zero-sdr-p0-result-v4"
     echo "started_epoch=$started_epoch"
     echo "ended_epoch=$ended_epoch"
     echo "runtime_seconds=$((ended_epoch - started_epoch))"

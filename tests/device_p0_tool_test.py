@@ -51,7 +51,7 @@ package=""
 for package do :; done
 case "$package" in
     cardputerzero-sdr)
-        printf 'install ok installed 0.1.0-8 arm64'
+        printf 'install ok installed 0.1.0-9 arm64'
         ;;
     librtlsdr0)
         [ "${FAKE_RTL_PACKAGE_MISSING:-0}" = 0 ] || exit 1
@@ -101,6 +101,12 @@ case "${1:-}" in
         ;;
     *) exit 2 ;;
 esac
+""",
+        )
+        write_executable(
+            fake_bin / "cardputerzero-sdr-test-app",
+            """#!/bin/sh
+sleep 2
 """,
         )
 
@@ -195,7 +201,7 @@ esac
         assert "plugdev_membership=present" in report
         assert "launcher_service=active" in report
         assert "app_processes=0" in report
-        assert "package=install ok installed 0.1.0-8 arm64" in report
+        assert "package=install ok installed 0.1.0-9 arm64" in report
         assert "rtl_runtime_package=install ok installed 2.0.2-2+b1 arm64" in report
         assert f"rtl_udev_rule=valid path={udev_rule}" in report
         assert "framebuffer_virtual_size=320,170" in report
@@ -399,6 +405,40 @@ esac
         assert "preflight=FAIL" in low_speed_report
         write(usb / "speed", "480\n")
 
+        sampled_environment = dict(environment)
+        sampled_environment["ZERO_SDR_P0_APP"] = str(
+            fake_bin / "cardputerzero-sdr-test-app"
+        )
+        sampled_output = root / "sampled-evidence"
+        result = subprocess.run(
+            [tool, "--duration", "60", "--interval", "1",
+             "--output", str(sampled_output)],
+            env=sampled_environment,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=6,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+        sampled_rows = (sampled_output / "resources.csv").read_text(
+            encoding="utf-8"
+        ).splitlines()
+        assert len(sampled_rows) >= 2
+        assert (
+            "battery_present,battery_status,battery_capacity_percent"
+            in sampled_rows[0]
+        )
+        assert all(
+            ",1,Charging,81,4100123,125500,273" in row
+            for row in sampled_rows[1:]
+        )
+        assert launcher_state.read_text(encoding="utf-8") == "active\n"
+        assert launcher_log.read_text(encoding="utf-8").splitlines() == [
+            "stop",
+            "start",
+        ]
+        launcher_log.unlink()
+
         short_output = root / "short-evidence"
         result = subprocess.run(
             [tool, "--duration", "60", "--interval", "1",
@@ -412,13 +452,19 @@ esac
         assert result.returncode == 1, result.stdout + result.stderr
         short_result = (short_output / "result.txt").read_text(encoding="utf-8")
         assert "duration_complete=0" in short_result
-        assert "schema=zero-sdr-p0-result-v3" in short_result
+        assert "schema=zero-sdr-p0-result-v4" in short_result
         assert "sample_interval_seconds=1" in short_result
         assert "app_exit_status=0" in short_result
         assert "forced_kill=0" in short_result
         assert "launcher_was_active=1" in short_result
         assert "launcher_stop_status=0" in short_result
         assert "launcher_restart_status=0" in short_result
+        short_resources_header = (
+            short_output / "resources.csv"
+        ).read_text(encoding="utf-8").splitlines()[0]
+        assert "battery_present,battery_status,battery_capacity_percent" in (
+            short_resources_header
+        )
         assert launcher_state.read_text(encoding="utf-8") == "active\n"
         assert launcher_log.read_text(encoding="utf-8").splitlines() == [
             "stop",

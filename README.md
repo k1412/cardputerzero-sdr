@@ -113,7 +113,7 @@ cardputerzero-sdr-p0 --duration 1800
 
 For the full run, the tool pauses an active `APPLaunch.service` through the normal user's systemd manager before it starts Zero SDR, then restores the launcher on completion, interruption, or an early app exit. This matches the launcher's exclusive-framebuffer contract without root access; the result records both transitions. The runner also refuses to start while another Zero SDR process exists.
 
-The runner creates a private evidence directory below `$XDG_STATE_HOME/cardputerzero-sdr/evidence/` (or `~/.local/state/`). It stores a sanitized hardware/access snapshot, `app.log`, process CPU/memory/temperature samples, board-battery capacity/voltage/current/temperature samples, and the exit result. It refuses root, excludes hostname/network state/USB serials, and stops the app through its tested clean `SIGTERM` path. Copy the evidence directory to a development checkout, then audit it on the development machine:
+The runner creates a private evidence directory below `$XDG_STATE_HOME/cardputerzero-sdr/evidence/` (or `~/.local/state/`). It stores a sanitized hardware/access snapshot, `app.log`, process CPU/memory/temperature samples, board-battery presence/status/capacity/voltage/current/temperature samples, and the exit result. It refuses root, excludes hostname/network state/USB serials, and stops the app through its tested clean `SIGTERM` path. Copy the evidence directory to a development checkout, then audit it on the development machine:
 
 ```sh
 python3 scripts/summarize_diagnostics.py --p0 path/to/evidence
@@ -129,7 +129,7 @@ The cross preset follows the official CardputerZero CMake template and downloads
 cmake --workflow --preset cp0-cross-package
 ```
 
-Expected package name: `dist/cardputerzero-sdr_0.1.0-8_arm64.deb`.
+Expected package name: `dist/cardputerzero-sdr_0.1.0-9_arm64.deb`.
 
 Do not treat a successful cross-build as device validation. Complete [the hardware test plan](docs/DEVICE_TEST_PLAN.md) before publishing a release.
 

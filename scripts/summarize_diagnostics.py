@@ -21,8 +21,8 @@ FIELD_PATTERN = re.compile(r"\b([a-z_]+)=([0-9]+)\b")
 RESOURCE_FIELDS = [
     "epoch", "pid", "state", "elapsed_s", "cpu_percent", "rss_kib",
     "vsz_kib", "mem_available_kib", "max_temp_millic",
-    "battery_capacity_percent", "battery_voltage_uv", "battery_current_ua",
-    "battery_temp_tenths_c",
+    "battery_present", "battery_status", "battery_capacity_percent",
+    "battery_voltage_uv", "battery_current_ua", "battery_temp_tenths_c",
 ]
 MONOTONIC_FIELDS = {
     "uptime_ms", "ui_loops", "max_ui_gap_ms", "connection_attempts",
@@ -191,7 +191,7 @@ def p0_evidence_checks(evidence_dir: Path,
         snapshots[-1].get("uptime_ms", 0) >= requested_seconds * 1000
     )
     checks.extend([
-        (result.get("schema") == "zero-sdr-p0-result-v3",
+        (result.get("schema") == "zero-sdr-p0-result-v4",
          "recognized P0 result schema"),
         (requested_seconds is not None and
          requested_seconds >= P0_RUNTIME_SECONDS,
@@ -227,6 +227,8 @@ def p0_evidence_checks(evidence_dir: Path,
     elapsed_values: list[int] = []
     resource_values_ok = resource_shape_ok
     pids: set[int] = set()
+    battery_presents: list[int] = []
+    battery_statuses: list[str] = []
     battery_capacities: list[int] = []
     battery_voltages: list[int] = []
     battery_currents: list[int] = []
@@ -243,6 +245,8 @@ def p0_evidence_checks(evidence_dir: Path,
                     int(row["mem_available_kib"])
                 if row["max_temp_millic"] != "unknown":
                     int(row["max_temp_millic"])
+                battery_presents.append(int(row["battery_present"]))
+                battery_statuses.append(row["battery_status"])
                 battery_capacities.append(int(row["battery_capacity_percent"]))
                 battery_voltages.append(int(row["battery_voltage_uv"]))
                 battery_currents.append(int(row["battery_current_ua"]))
@@ -252,16 +256,22 @@ def p0_evidence_checks(evidence_dir: Path,
         except (KeyError, TypeError, ValueError):
             resource_values_ok = False
     battery_samples_ok = (
+        len(battery_presents) == len(battery_statuses) ==
         len(battery_capacities) == len(resource_rows) > 0 and
+        all(value == 1 for value in battery_presents) and
+        all(value in {"Charging", "Discharging", "Not charging", "Full"}
+            for value in battery_statuses) and
         all(0 <= value <= 100 for value in battery_capacities) and
         all(0 <= value <= 20_000_000 for value in battery_voltages) and
         all(-5_000_499 <= value <= 5_000_499 for value in battery_currents) and
         all(-400 <= value <= 1_000 for value in battery_temperatures)
     )
     if battery_samples_ok:
+        statuses = "/".join(sorted(set(battery_statuses)))
         battery_description = (
             "continuous board-battery telemetry is valid "
-            f"(capacity {min(battery_capacities)}-{max(battery_capacities)}%, "
+            f"(present throughout, status {statuses}, "
+            f"capacity {min(battery_capacities)}-{max(battery_capacities)}%, "
             f"voltage {min(battery_voltages) / 1000:.0f}-"
             f"{max(battery_voltages) / 1000:.0f} mV, "
             f"current {min(battery_currents) / 1000:.0f}-"

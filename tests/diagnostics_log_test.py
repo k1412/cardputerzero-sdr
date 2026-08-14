@@ -55,7 +55,7 @@ monitor_tools=ok
 launcher_service=active
 device_model=M5Stack Cardputer Zero path=/sys/firmware/devicetree/base/model
 cardputerzero_overlay=cardputerzero-v5-overlay path=/boot/firmware/config.txt
-package=install ok installed 0.1.0-8 arm64
+package=install ok installed 0.1.0-9 arm64
 rtl_runtime_package=install ok installed 2.0.2-2+b1 arm64
 rtl_udev_rule=valid path=/usr/lib/udev/rules.d/60-librtlsdr0.rules
 battery_supply=bq27220-0
@@ -72,7 +72,7 @@ preflight=PASS
         encoding="utf-8",
     )
     (evidence / "result.txt").write_text(
-        """schema=zero-sdr-p0-result-v3
+        """schema=zero-sdr-p0-result-v4
 started_epoch=1000
 ended_epoch=2800
 runtime_seconds=1800
@@ -90,12 +90,13 @@ diagnostics_records=60
     )
     rows = [
         "epoch,pid,state,elapsed_s,cpu_percent,rss_kib,vsz_kib,"
-        "mem_available_kib,max_temp_millic,battery_capacity_percent,"
-        "battery_voltage_uv,battery_current_ua,battery_temp_tenths_c"
+        "mem_available_kib,max_temp_millic,battery_present,battery_status,"
+        "battery_capacity_percent,battery_voltage_uv,battery_current_ua,"
+        "battery_temp_tenths_c"
     ]
     rows.extend(
         f"{1000 + elapsed},4321,S,{elapsed},42.5,32768,65536,512000,48000,"
-        "81,4100123,125500,273"
+        "1,Charging,81,4100123,125500,273"
         for elapsed in range(0, 1801, 30)
     )
     (evidence / "resources.csv").write_text(
@@ -167,10 +168,19 @@ def main() -> int:
 
         resources_path.write_text(
             good_resources.replace(
-                ",81,4100123,125500,273",
-                ",81,4100123,9000000,273",
+                ",1,Charging,81,4100123,125500,273",
+                ",1,Charging,81,4100123,9000000,273",
                 1,
             ),
+            encoding="utf-8",
+        )
+        result = run(script, evidence)
+        assert result.returncode == 1, result.stdout + result.stderr
+        assert "FAIL: continuous board-battery telemetry is valid" in result.stdout
+        resources_path.write_text(good_resources, encoding="utf-8")
+
+        resources_path.write_text(
+            good_resources.replace(",1,Charging,", ",0,Unknown,", 1),
             encoding="utf-8",
         )
         result = run(script, evidence)
