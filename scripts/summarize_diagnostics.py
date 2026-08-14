@@ -27,7 +27,9 @@ RESOURCE_FIELDS = [
 MONOTONIC_FIELDS = {
     "uptime_ms", "ui_loops", "max_ui_gap_ms", "connection_attempts",
     "successful_connections", "retry_waits", "read_errors",
-    "settings_updates", "iq_blocks", "iq_bytes", "audio_generated",
+    "settings_updates", "key_events", "key_repeats",
+    "key_navigation", "key_confirm_back", "key_shortcuts",
+    "key_direct_entry", "iq_blocks", "iq_bytes", "audio_generated",
     "audio_written", "audio_dropped", "audio_recoveries",
     "audio_write_errors", "audio_open_failures", "total_processing_us",
     "max_processing_us",
@@ -191,7 +193,7 @@ def p0_evidence_checks(evidence_dir: Path,
         snapshots[-1].get("uptime_ms", 0) >= requested_seconds * 1000
     )
     checks.extend([
-        (result.get("schema") == "zero-sdr-p0-result-v4",
+        (result.get("schema") == "zero-sdr-p0-result-v5",
          "recognized P0 result schema"),
         (requested_seconds is not None and
          requested_seconds >= P0_RUNTIME_SECONDS,
@@ -312,9 +314,20 @@ def p0_evidence_checks(evidence_dir: Path,
 def p0_checks(metrics: dict[str, int], runtime_seconds: float,
               iq_rate: float, audio_written_rate: float,
               average_processing_us: float) -> list[tuple[bool, str]]:
+    categorized_key_events = (
+        metrics["key_navigation"] + metrics["key_confirm_back"] +
+        metrics["key_shortcuts"] + metrics["key_direct_entry"]
+    )
     checks = [
         (runtime_seconds >= P0_RUNTIME_SECONDS,
          f"continuous runtime >= {P0_RUNTIME_SECONDS} s"),
+        (metrics["key_events"] == categorized_key_events and
+         all(metrics[field] > 0 for field in
+             ("key_navigation", "key_confirm_back", "key_shortcuts",
+              "key_direct_entry")),
+         "privacy-safe input counters cover every Cardputer control group"),
+        (metrics["key_repeats"] > 0,
+         "at least one physical-key repeat was observed"),
         (metrics["connection_attempts"] == 1 and
          metrics["successful_connections"] == 1 and
          metrics["retry_waits"] == 0,
@@ -373,6 +386,8 @@ def main() -> int:
     metrics = snapshots[-1]
     required = {
         "uptime_ms", "muted", "ui_loops", "max_ui_gap_ms",
+        "key_events", "key_repeats", "key_navigation",
+        "key_confirm_back", "key_shortcuts", "key_direct_entry",
         "connection_attempts", "successful_connections", "retry_waits",
         "read_errors", "settings_updates", "iq_blocks", "iq_bytes",
         "audio_generated", "audio_written", "audio_dropped",
@@ -412,6 +427,11 @@ def main() -> int:
           f"{metrics['max_processing_us']:,} us per IQ block "
           f"({processing_load:.1f}% single-worker load)")
     print(f"  UI loops/max gap: {metrics['ui_loops']}/{metrics['max_ui_gap_ms']} ms")
+    print(f"  key events/repeats: {metrics['key_events']}/"
+          f"{metrics['key_repeats']} (navigation {metrics['key_navigation']}, "
+          f"confirm/back {metrics['key_confirm_back']}, "
+          f"shortcuts {metrics['key_shortcuts']}, "
+          f"direct entry {metrics['key_direct_entry']})")
 
     if not args.p0:
         return 0

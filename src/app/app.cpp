@@ -270,6 +270,7 @@ int Application::run() {
     simulator_frame.bind_dark_mode(view_model.dark_mode_subject());
 #endif
 
+    platform::reset_app_input_activity_metrics();
     ScreenManager screen_manager(view_model, assets);
     screen_manager.start();
 
@@ -327,8 +328,11 @@ int Application::run() {
         ++ui_loop_count;
         if (lv_tick_elaps(diagnostics_last_at) >= diagnostics_interval) {
             const auto metrics = view_model.radio_metrics();
+            const auto input = platform::app_input_activity_metrics();
             LOG_INFO("diagnostics uptime_ms={} frequency_hz={} muted={} "
                      "ui_loops={} max_ui_gap_ms={} "
+                     "key_events={} key_repeats={} key_navigation={} "
+                     "key_confirm_back={} key_shortcuts={} key_direct_entry={} "
                      "connection_attempts={} successful_connections={} retry_waits={} "
                      "read_errors={} settings_updates={} iq_blocks={} iq_bytes={} "
                      "audio_generated={} audio_written={} audio_dropped={} "
@@ -339,6 +343,12 @@ int Application::run() {
                      view_model.is_muted() ? 1 : 0,
                      ui_loop_count,
                      ui_loop_max_gap_ms,
+                     input.events,
+                     input.repeats,
+                     input.navigation,
+                     input.confirm_back,
+                     input.shortcuts,
+                     input.direct_entry,
                      metrics.connection_attempts,
                      metrics.successful_connections,
                      metrics.retry_waits,

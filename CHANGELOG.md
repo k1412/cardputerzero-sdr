@@ -40,9 +40,10 @@ All notable changes will be documented here. The project follows Semantic Versio
 - Whole-directory P0 evidence validation covering device-tree identity, preflight privacy/access, launcher restoration, clean exit, monotonic diagnostics, and resource-sample duration
 - Draft official Store submission for independent package validation, explicitly held from review and merge until physical P0 evidence is attached
 - Explicit `ZSDR` Store share code to avoid the registry generator's colliding `card` package-prefix fallback
-- Debian revision 9 for the Store candidate so its BQ27220 selection and continuous power-evidence changes have a unique, reproducible version
+- Debian revision 10 for the Store candidate so its device-input and continuous power-evidence changes have a unique, reproducible version
 - Cardputer Zero battery selection that prioritizes the official BQ27220/BQ27 sysfs device, honors its physical-present flag, rejects invalid capacity, and is covered alongside Wi-Fi/Ethernet status by host tests
-- P0 preflight v5/result v4 evidence with continuous board-battery presence, charging status, capacity, voltage, current, and temperature validation for the USB-power release gate
+- P0 preflight v5/result v5 evidence with continuous board-battery presence, charging status, capacity, voltage, current, and temperature validation for the USB-power release gate
+- Privacy-safe physical-key diagnostics and P0 gates covering navigation, confirm/back, shortcuts, direct entry, and controlled repeat without logging individual key values
 
 ### Known limitations
 

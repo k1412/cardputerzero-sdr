@@ -72,4 +72,24 @@ int main() {
         assert(!accepts_app_key_repeat(AppInputContext::DirectEntry,
                                        static_cast<AppKey>(value)));
     }
+
+    platform::AppInputActivity activity;
+    activity.record(AppKey::None, false);
+    activity.record(AppKey::Left, false);
+    activity.record(AppKey::Right, true);
+    activity.record(AppKey::Confirm, false);
+    activity.record(AppKey::Back, false);
+    activity.record(AppKey::Gain, false);
+    activity.record(AppKey::Mute, false);
+    activity.record(AppKey::Language, false);
+    activity.record(AppKey::Theme, false);
+    activity.record(AppKey::Digit9, false);
+    activity.record(AppKey::Decimal, false);
+    activity.record(AppKey::Delete, false);
+    assert(activity.events == 11);
+    assert(activity.repeats == 1);
+    assert(activity.navigation == 2);
+    assert(activity.confirm_back == 2);
+    assert(activity.shortcuts == 4);
+    assert(activity.direct_entry == 3);
 }

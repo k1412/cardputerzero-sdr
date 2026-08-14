@@ -547,7 +547,7 @@ restore_launcher
 trap - 0
 
 {
-    echo "schema=zero-sdr-p0-result-v4"
+    echo "schema=zero-sdr-p0-result-v5"
     echo "started_epoch=$started_epoch"
     echo "ended_epoch=$ended_epoch"
     echo "runtime_seconds=$((ended_epoch - started_epoch))"

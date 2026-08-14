@@ -45,6 +45,56 @@ enum class AppKeyboardCapability : uint32_t {
     DirectEntry = 1U << 3,
 };
 
+struct AppInputActivity {
+    uint64_t events{0};
+    uint64_t repeats{0};
+    uint64_t navigation{0};
+    uint64_t confirm_back{0};
+    uint64_t shortcuts{0};
+    uint64_t direct_entry{0};
+
+    constexpr void record(AppKey key, bool repeated) {
+        if (key == AppKey::None) return;
+
+        ++events;
+        if (repeated) ++repeats;
+        switch (key) {
+            case AppKey::Up:
+            case AppKey::Down:
+            case AppKey::Left:
+            case AppKey::Right:
+                ++navigation;
+                return;
+            case AppKey::Confirm:
+            case AppKey::Back:
+                ++confirm_back;
+                return;
+            case AppKey::Gain:
+            case AppKey::Mute:
+            case AppKey::Language:
+            case AppKey::Theme:
+                ++shortcuts;
+                return;
+            case AppKey::Digit0:
+            case AppKey::Digit1:
+            case AppKey::Digit2:
+            case AppKey::Digit3:
+            case AppKey::Digit4:
+            case AppKey::Digit5:
+            case AppKey::Digit6:
+            case AppKey::Digit7:
+            case AppKey::Digit8:
+            case AppKey::Digit9:
+            case AppKey::Decimal:
+            case AppKey::Delete:
+                ++direct_entry;
+                return;
+            case AppKey::None:
+                return;
+        }
+    }
+};
+
 constexpr uint32_t kAppKeyRepeatDelayMs = 500;
 constexpr uint32_t kAppKeyRepeatRateMs = 50;
 

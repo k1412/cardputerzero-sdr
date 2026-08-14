@@ -33,6 +33,7 @@ bool last_key_pressed = false;
 bool nav_shortcut_mode = false;
 AppKeyHandler app_key_handler = nullptr;
 void* app_key_user_data = nullptr;
+AppInputActivity input_activity{};
 
 #if !USE_DESKTOP
 struct EvdevKeypad {
@@ -111,6 +112,7 @@ void dispatch_app_key(uint32_t key, bool repeated) {
 
     const auto app_key = normalize_app_key(key);
     if (app_key != AppKey::None) {
+        input_activity.record(app_key, repeated);
         app_key_handler(app_key, repeated, app_key_user_data);
     }
 }
@@ -519,6 +521,14 @@ void clear_app_key_handler(void* user_data) {
         last_key = 0;
         last_key_pressed = false;
     }
+}
+
+AppInputActivity app_input_activity_metrics() {
+    return input_activity;
+}
+
+void reset_app_input_activity_metrics() {
+    input_activity = {};
 }
 
 void set_nav_shortcut_mode(bool enabled) {

@@ -51,7 +51,7 @@ package=""
 for package do :; done
 case "$package" in
     cardputerzero-sdr)
-        printf 'install ok installed 0.1.0-9 arm64'
+        printf 'install ok installed 0.1.0-10 arm64'
         ;;
     librtlsdr0)
         [ "${FAKE_RTL_PACKAGE_MISSING:-0}" = 0 ] || exit 1
@@ -201,7 +201,7 @@ sleep 2
         assert "plugdev_membership=present" in report
         assert "launcher_service=active" in report
         assert "app_processes=0" in report
-        assert "package=install ok installed 0.1.0-9 arm64" in report
+        assert "package=install ok installed 0.1.0-10 arm64" in report
         assert "rtl_runtime_package=install ok installed 2.0.2-2+b1 arm64" in report
         assert f"rtl_udev_rule=valid path={udev_rule}" in report
         assert "framebuffer_virtual_size=320,170" in report
@@ -452,7 +452,7 @@ sleep 2
         assert result.returncode == 1, result.stdout + result.stderr
         short_result = (short_output / "result.txt").read_text(encoding="utf-8")
         assert "duration_complete=0" in short_result
-        assert "schema=zero-sdr-p0-result-v4" in short_result
+        assert "schema=zero-sdr-p0-result-v5" in short_result
         assert "sample_interval_seconds=1" in short_result
         assert "app_exit_status=0" in short_result
         assert "forced_kill=0" in short_result

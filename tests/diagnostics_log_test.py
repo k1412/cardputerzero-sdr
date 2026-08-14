@@ -28,10 +28,24 @@ def diagnostics_record(seconds: int) -> str:
     iq_blocks = seconds * 250
     iq_bytes = seconds * 4_096_000
     audio_frames = seconds * 32_000
+    input_cycles = seconds // 30
+    key_navigation = input_cycles * 4
+    key_confirm_back = input_cycles * 2
+    key_shortcuts = input_cycles * 4
+    key_direct_entry = input_cycles * 4
+    key_events = (
+        key_navigation + key_confirm_back + key_shortcuts +
+        key_direct_entry
+    )
     return (
         f"[zero-sdr][I] diagnostics uptime_ms={seconds * 1000} "
         "frequency_hz=97400000 muted=0 "
         f"ui_loops={seconds * 160} max_ui_gap_ms=12 "
+        f"key_events={key_events} key_repeats={input_cycles} "
+        f"key_navigation={key_navigation} "
+        f"key_confirm_back={key_confirm_back} "
+        f"key_shortcuts={key_shortcuts} "
+        f"key_direct_entry={key_direct_entry} "
         "connection_attempts=1 successful_connections=1 retry_waits=0 "
         "read_errors=0 settings_updates=2 "
         f"iq_blocks={iq_blocks} iq_bytes={iq_bytes} "
@@ -55,7 +69,7 @@ monitor_tools=ok
 launcher_service=active
 device_model=M5Stack Cardputer Zero path=/sys/firmware/devicetree/base/model
 cardputerzero_overlay=cardputerzero-v5-overlay path=/boot/firmware/config.txt
-package=install ok installed 0.1.0-9 arm64
+package=install ok installed 0.1.0-10 arm64
 rtl_runtime_package=install ok installed 2.0.2-2+b1 arm64
 rtl_udev_rule=valid path=/usr/lib/udev/rules.d/60-librtlsdr0.rules
 battery_supply=bq27220-0
@@ -72,7 +86,7 @@ preflight=PASS
         encoding="utf-8",
     )
     (evidence / "result.txt").write_text(
-        """schema=zero-sdr-p0-result-v4
+        """schema=zero-sdr-p0-result-v5
 started_epoch=1000
 ended_epoch=2800
 runtime_seconds=1800
@@ -119,6 +133,8 @@ def main() -> int:
         assert "PASS: resource samples cover the requested run" in result.stdout
         assert "PASS: Cardputer BQ battery telemetry passed preflight" in result.stdout
         assert "PASS: continuous board-battery telemetry is valid" in result.stdout
+        assert "PASS: privacy-safe input counters cover every Cardputer control group" in result.stdout
+        assert "PASS: at least one physical-key repeat was observed" in result.stdout
         assert "P0 continuous-capture checks" in result.stdout
         assert "Overall: PASS" in result.stdout
         assert "4,096,000 bytes/s" in result.stdout
@@ -141,6 +157,18 @@ def main() -> int:
         assert result.returncode == 1, result.stdout + result.stderr
         assert "FAIL: zero RTL-SDR read errors" in result.stdout
         assert "Overall: FAIL" in result.stdout
+        (evidence / "app.log").write_text(good_log, encoding="utf-8")
+
+        (evidence / "app.log").write_text(
+            good_log.replace("key_shortcuts=240", "key_shortcuts=0"),
+            encoding="utf-8",
+        )
+        result = run(script, evidence)
+        assert result.returncode == 1, result.stdout + result.stderr
+        assert (
+            "FAIL: privacy-safe input counters cover every Cardputer control group"
+            in result.stdout
+        )
         (evidence / "app.log").write_text(good_log, encoding="utf-8")
 
         result_path = evidence / "result.txt"

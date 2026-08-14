@@ -93,7 +93,7 @@ ZERO_SDR_SCREENSHOT_EXIT=1 \
 
 ## 运行诊断
 
-应用默认每 30 秒向标准输出写入一条结构化 `diagnostics` 记录，其中包含累计连接/重试/读取错误、IQ 数据块与字节数、音频生成/写入/丢帧、ALSA 恢复与故障、DSP 处理耗时、界面循环次数和最大界面循环间隔。需要调整周期时，可将 `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` 设置为 100–3,600,000 毫秒。
+应用默认每 30 秒向标准输出写入一条结构化 `diagnostics` 记录，其中包含累计连接/重试/读取错误、IQ 数据块与字节数、音频生成/写入/丢帧、ALSA 恢复与故障、DSP 处理耗时、界面循环次数、最大界面循环间隔，以及按导航、确认/返回、快捷键、直接输入和重复分类的隐私友好实体键盘活动计数；它不会记录具体键值。需要调整周期时，可将 `ZERO_SDR_DIAGNOSTICS_INTERVAL_MS` 设置为 100–3,600,000 毫秒。
 
 ARM64 安装包会提供 `cardputerzero-sdr-p0`，这是一个无需 root 的设备预检与证据采集工具。运行前不要留下另一个 Zero SDR 实例。先通过 SSH 或本地终端，以正常 APPLaunch 用户检查设备树型号与官方 Cardputer Zero overlay、已安装的 ARM64 应用和 `librtlsdr0` 包、`plugdev` 成员资格、发行版维护的 RTL-SDR 规则、USB 高速链路、原生 320×170 帧缓冲、官方 APPLaunch/Cardputer 键盘路径、RTL-SDR USB 节点、可写 ALSA 播放节点，以及有效的板载 BQ27220/BQ27 电池遥测：
 
@@ -119,7 +119,7 @@ cardputerzero-sdr-p0 --duration 1800
 python3 scripts/summarize_diagnostics.py --p0 path/to/evidence
 ```
 
-`--p0` 会审计完整证据目录，而不是只信任 `app.log`。它会检查设备树身份、预检格式与隐私边界、已安装软件包、是否存在并发实例、应用是否正常退出、APPLaunch 是否正确暂停并恢复、诊断计数器是否单调、板载电池遥测是否连续、资源采样是否覆盖完整时段，以及 30 分钟连续接收门禁。连续接收要求：仅有一次无中断连接、RF/音频错误和丢帧均为零、IQ 吞吐在 4,096,000 字节/秒的 ±10% 内、未静音音频写入在 32,000 帧/秒的 ±10% 内，并且平均处理耗时小于每个 IQ 数据块 4,000 微秒的实时预算。最大单次处理耗时和界面循环间隔会被记录，用于建立实体设备基线，不会在没有实测数据时臆定发布阈值。完整步骤见[硬件测试计划](docs/DEVICE_TEST_PLAN.md)。
+`--p0` 会审计完整证据目录，而不是只信任 `app.log`。它会检查设备树身份、预检格式与隐私边界、已安装软件包、是否存在并发实例、应用是否正常退出、APPLaunch 是否正确暂停并恢复、诊断计数器是否单调、是否以隐私友好计数覆盖 Cardputer 全部控制类别及长按重复、板载电池遥测是否连续、资源采样是否覆盖完整时段，以及 30 分钟连续接收门禁。连续接收要求：仅有一次无中断连接、RF/音频错误和丢帧均为零、IQ 吞吐在 4,096,000 字节/秒的 ±10% 内、未静音音频写入在 32,000 帧/秒的 ±10% 内，并且平均处理耗时小于每个 IQ 数据块 4,000 微秒的实时预算。最大单次处理耗时和界面循环间隔会被记录，用于建立实体设备基线，不会在没有实测数据时臆定发布阈值。完整步骤见[硬件测试计划](docs/DEVICE_TEST_PLAN.md)。
 
 ## Cardputer Zero 构建
 
@@ -129,7 +129,7 @@ python3 scripts/summarize_diagnostics.py --p0 path/to/evidence
 cmake --workflow --preset cp0-cross-package
 ```
 
-预期安装包：`dist/cardputerzero-sdr_0.1.0-9_arm64.deb`。
+预期安装包：`dist/cardputerzero-sdr_0.1.0-10_arm64.deb`。
 
 交叉编译成功不等同于实机验证。发布前必须完成[硬件测试计划](docs/DEVICE_TEST_PLAN.md)中的检查。
 

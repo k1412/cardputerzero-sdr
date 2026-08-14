@@ -51,6 +51,6 @@ capture device-busy env ZERO_SDR_LIVE=1 \
   ZERO_SDR_RTLSDR_LIBRARY="$fake_rtlsdr" \
   ZERO_SDR_FAKE_OPEN_RESULT=-6
 
-grep -Eq 'diagnostics .*ui_loops=[0-9]+ .*iq_blocks=[1-9][0-9]* .*total_processing_us=[1-9][0-9]*' \
+grep -Eq 'diagnostics .*ui_loops=[0-9]+ .*key_events=[0-9]+ .*key_repeats=[0-9]+ .*key_navigation=[0-9]+ .*key_confirm_back=[0-9]+ .*key_shortcuts=[0-9]+ .*key_direct_entry=[0-9]+ .*iq_blocks=[1-9][0-9]* .*total_processing_us=[1-9][0-9]*' \
   "$output_dir/live.log"
 printf 'PASS diagnostics-log\n'
