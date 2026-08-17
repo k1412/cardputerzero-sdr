@@ -1,6 +1,6 @@
 # Zero SDR browser product simulator
 
-Static browser simulator for product-level review of the 320×170 Cardputer Zero application UI.
+LAN-only browser simulator and radio for product-level review of the 320×170 Cardputer Zero application UI.
 
 It mirrors the application's frequency limits, tuning steps, FC0012 gain values, ten locales, light/dark themes, keyboard policy, direct frequency entry, and release-relevant receiver failure states. When the optional native bridge is running, the simulator displays privacy-safe spectrum and metrics from the attached RTL-SDR and sends bounded tuning/gain controls to it. USB serials and host/network identity are never exposed by the API.
 
@@ -30,14 +30,17 @@ mkdir -p build/web-simulator
 g++ -std=c++20 -O2 -pthread -ldl -Isrc \
   web-simulator/bridge.cpp \
   src/device/rtl_sdr_device.cpp src/dsp/iq_spectrum.cpp \
+  src/dsp/wfm_demodulator.cpp \
   -o build/web-simulator/zero-sdr-bridge
 ZERO_SDR_WEB_ROOT="$PWD/web-simulator" \
   ./build/web-simulator/zero-sdr-bridge
 ```
 
-The bridge listens on `0.0.0.0:18117` by default. It serves the static simulator, `GET /api/status`, bounded `POST /api/control`, and `/healthz`.
+The bridge listens on `0.0.0.0:18117` by default. It serves the static simulator, `GET /api/status`, `GET /api/audio`, bounded `POST /api/control`, and `/healthz`.
 
-The live bridge carries spectrum data and bounded frequency/gain controls. Browser audio is intentionally not streamed yet. Control requests are same-origin by default and globally limited to 30 requests per second.
+The live bridge carries spectrum data, bounded frequency/gain controls, and mono 32 kHz WFM audio. Open `http://<host-lan-ip>:18117`, select a frequency in the 76–108 MHz broadcast band, and press **播放真机声音**. Browsers require this click before audio may start. Audio is delivered as short same-origin signed 16-bit PCM blocks from `GET /api/audio`; the bridge keeps only three seconds in memory and does not record it.
+
+The service is intended for a trusted LAN or private tailnet and is not exposed through a public reverse proxy. Control requests are globally limited to 30 requests per second and audio requests to 120 requests per second.
 
 ## Public design references
 

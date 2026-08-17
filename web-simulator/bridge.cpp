@@ -2,16 +2,19 @@
 
 #include "device/rtl_sdr_device.h"
 #include "dsp/iq_spectrum.h"
+#include "dsp/wfm_demodulator.h"
 
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <cerrno>
 #include <chrono>
+#include <cmath>
 #include <csignal>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
+#include <deque>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
@@ -37,7 +40,11 @@ constexpr uint32_t kMinimumFrequencyHz = 22'000'000;
 constexpr uint32_t kMaximumFrequencyHz = 948'600'000;
 constexpr uint32_t kDefaultFrequencyHz = 97'400'000;
 constexpr uint32_t kSampleRateHz = 2'048'000;
+constexpr uint32_t kBroadcastMinimumFrequencyHz = 76'000'000;
+constexpr uint32_t kBroadcastMaximumFrequencyHz = 108'000'000;
 constexpr size_t kIqBlockBytes = 16 * 16'384;
+constexpr size_t kAudioRingSamples = dsp::WfmDemodulator::kAudioSampleRateHz * 3;
+constexpr size_t kMaximumAudioResponseSamples = 8'192;
 constexpr uint16_t kDefaultPort = 18'117;
 
 std::atomic_bool running{true};
@@ -45,6 +52,10 @@ std::mutex control_rate_mutex;
 std::chrono::steady_clock::time_point control_window_started{
     std::chrono::steady_clock::now()};
 unsigned control_requests_in_window{0};
+std::mutex audio_rate_mutex;
+std::chrono::steady_clock::time_point audio_window_started{
+    std::chrono::steady_clock::now()};
+unsigned audio_requests_in_window{0};
 
 void handle_signal(int) {
     running.store(false);
@@ -88,6 +99,13 @@ struct BridgeState {
     uint64_t iq_bytes{0};
     uint64_t read_errors{0};
     uint64_t reconnects{0};
+    std::deque<int16_t> audio_samples;
+    uint64_t audio_start_sample{0};
+    uint64_t audio_end_sample{0};
+    uint64_t audio_chunks{0};
+    uint64_t audio_epoch{1};
+    uint32_t audio_peak{0};
+    uint32_t audio_rms{0};
     std::chrono::steady_clock::time_point started_at{std::chrono::steady_clock::now()};
 };
 
@@ -101,8 +119,43 @@ struct RequestedControl {
 BridgeState bridge_state;
 RequestedControl requested_control;
 
+bool is_broadcast_frequency(uint32_t frequency_hz) {
+    return frequency_hz >= kBroadcastMinimumFrequencyHz &&
+           frequency_hz <= kBroadcastMaximumFrequencyHz;
+}
+
+void reset_audio_locked() {
+    bridge_state.audio_samples.clear();
+    bridge_state.audio_start_sample = bridge_state.audio_end_sample;
+    bridge_state.audio_peak = 0;
+    bridge_state.audio_rms = 0;
+    ++bridge_state.audio_epoch;
+}
+
+void append_audio_locked(const std::vector<int16_t>& samples) {
+    if (samples.empty()) return;
+    uint32_t peak = 0;
+    long double square_sum = 0.0L;
+    for (const int16_t sample : samples) {
+        const int32_t magnitude = std::abs(static_cast<int32_t>(sample));
+        peak = std::max(peak, static_cast<uint32_t>(magnitude));
+        square_sum += static_cast<long double>(sample) * static_cast<long double>(sample);
+        bridge_state.audio_samples.push_back(sample);
+    }
+    bridge_state.audio_end_sample += samples.size();
+    ++bridge_state.audio_chunks;
+    bridge_state.audio_peak = peak;
+    bridge_state.audio_rms = static_cast<uint32_t>(std::lround(
+        std::sqrt(square_sum / static_cast<long double>(samples.size()))));
+    while (bridge_state.audio_samples.size() > kAudioRingSamples) {
+        bridge_state.audio_samples.pop_front();
+        ++bridge_state.audio_start_sample;
+    }
+}
+
 void publish_status(std::string status, std::string detail = {}, std::string device_name = {}) {
     std::lock_guard lock(bridge_state.mutex);
+    if (status != "live" && bridge_state.status == "live") reset_audio_locked();
     bridge_state.status = std::move(status);
     bridge_state.detail = std::move(detail);
     if (!device_name.empty()) bridge_state.device_name = std::move(device_name);
@@ -167,12 +220,15 @@ void receiver_loop() {
             bridge_state.automatic_gain = initial_auto_gain;
             bridge_state.gain_tenths_db = initial_gain;
             bridge_state.supported_gains = gains;
+            reset_audio_locked();
             ++bridge_state.reconnects;
         }
 
         dsp::IqSpectrum spectrum_processor;
+        dsp::WfmDemodulator audio_processor;
         std::vector<uint8_t> iq(kIqBlockBytes);
         uint64_t applied_revision = requested_control.revision.load();
+        uint32_t applied_frequency = initial_frequency;
 
         while (running.load() && radio.is_open()) {
             const uint64_t revision = requested_control.revision.load();
@@ -191,7 +247,10 @@ void receiver_loop() {
                     bridge_state.frequency_hz = frequency;
                     bridge_state.automatic_gain = automatic_gain;
                     bridge_state.gain_tenths_db = gain;
+                    reset_audio_locked();
                 }
+                audio_processor.reset();
+                applied_frequency = frequency;
                 applied_revision = revision;
             }
 
@@ -207,6 +266,9 @@ void receiver_loop() {
             }
 
             const auto frame = spectrum_processor.process(iq.data(), bytes_read);
+            const auto audio = is_broadcast_frequency(applied_frequency)
+                ? audio_processor.process(iq.data(), bytes_read)
+                : std::vector<int16_t>{};
             {
                 std::lock_guard lock(bridge_state.mutex);
                 bridge_state.status = "live";
@@ -215,6 +277,7 @@ void receiver_loop() {
                 bridge_state.frame_sequence = frame.sequence;
                 ++bridge_state.iq_blocks;
                 bridge_state.iq_bytes += bytes_read;
+                append_audio_locked(audio);
             }
         }
 
@@ -240,6 +303,18 @@ std::string status_json() {
         << ",\"iq_bytes\":" << bridge_state.iq_bytes
         << ",\"read_errors\":" << bridge_state.read_errors
         << ",\"reconnects\":" << bridge_state.reconnects
+        << ",\"audio_available\":"
+        << (bridge_state.status == "live" &&
+            is_broadcast_frequency(bridge_state.frequency_hz) &&
+            !bridge_state.audio_samples.empty() ? "true" : "false")
+        << ",\"audio_sample_rate_hz\":" << dsp::WfmDemodulator::kAudioSampleRateHz
+        << ",\"audio_epoch\":" << bridge_state.audio_epoch
+        << ",\"audio_start_sample\":" << bridge_state.audio_start_sample
+        << ",\"audio_end_sample\":" << bridge_state.audio_end_sample
+        << ",\"audio_buffered_samples\":" << bridge_state.audio_samples.size()
+        << ",\"audio_chunks\":" << bridge_state.audio_chunks
+        << ",\"audio_peak\":" << bridge_state.audio_peak
+        << ",\"audio_rms\":" << bridge_state.audio_rms
         << ",\"uptime_ms\":" << uptime << ",\"supported_gains_tenths_db\":[";
     for (size_t index = 0; index < bridge_state.supported_gains.size(); ++index) {
         if (index) out << ',';
@@ -293,7 +368,7 @@ struct HttpResponse {
 
 HttpResponse json_error(int status, std::string reason, std::string detail) {
     return {status, std::move(reason), "application/json; charset=utf-8",
-            "{\"ok\":false,\"error\":\"" + json_escape(detail) + "\"}"};
+            "{\"ok\":false,\"error\":\"" + json_escape(detail) + "\"}", {}};
 }
 
 bool control_rate_allowed() {
@@ -307,6 +382,114 @@ bool control_rate_allowed() {
     if (control_requests_in_window >= kMaximumControlRequestsPerSecond) return false;
     ++control_requests_in_window;
     return true;
+}
+
+bool audio_rate_allowed() {
+    constexpr unsigned kMaximumAudioRequestsPerSecond = 120;
+    const auto now = std::chrono::steady_clock::now();
+    std::lock_guard lock(audio_rate_mutex);
+    if (now - audio_window_started >= 1s) {
+        audio_window_started = now;
+        audio_requests_in_window = 0;
+    }
+    if (audio_requests_in_window >= kMaximumAudioRequestsPerSecond) return false;
+    ++audio_requests_in_window;
+    return true;
+}
+
+std::optional<uint64_t> query_unsigned(std::string_view target, std::string_view key) {
+    const size_t query = target.find('?');
+    if (query == std::string_view::npos) return std::nullopt;
+    const std::string needle = std::string(key) + "=";
+    size_t position = query + 1;
+    while (position < target.size()) {
+        const size_t end = target.find('&', position);
+        const std::string_view field = target.substr(
+            position, end == std::string_view::npos ? target.size() - position : end - position);
+        if (field.starts_with(needle)) {
+            const std::string value(field.substr(needle.size()));
+            if (value.empty() || !std::all_of(value.begin(), value.end(), [](unsigned char ch) {
+                    return ch >= '0' && ch <= '9';
+                })) {
+                return std::nullopt;
+            }
+            char* parse_end = nullptr;
+            errno = 0;
+            const unsigned long long parsed = std::strtoull(value.c_str(), &parse_end, 10);
+            if (errno != 0 || !parse_end || *parse_end != '\0') return std::nullopt;
+            return static_cast<uint64_t>(parsed);
+        }
+        if (end == std::string_view::npos) break;
+        position = end + 1;
+    }
+    return std::nullopt;
+}
+
+bool query_contains(std::string_view target, std::string_view key) {
+    const size_t query = target.find('?');
+    if (query == std::string_view::npos) return false;
+    const std::string needle = std::string(key) + "=";
+    size_t position = query + 1;
+    while (position < target.size()) {
+        const size_t end = target.find('&', position);
+        const std::string_view field = target.substr(
+            position, end == std::string_view::npos ? target.size() - position : end - position);
+        if (field.starts_with(needle)) return true;
+        if (end == std::string_view::npos) break;
+        position = end + 1;
+    }
+    return false;
+}
+
+HttpResponse audio_response(std::string_view target) {
+    if (!audio_rate_allowed()) {
+        auto response = json_error(429, "Too Many Requests", "audio request rate limit exceeded");
+        response.headers.emplace_back("Retry-After", "1");
+        return response;
+    }
+    const auto after = query_unsigned(target, "after");
+    if (query_contains(target, "after") && !after) {
+        return json_error(400, "Bad Request", "invalid audio cursor");
+    }
+
+    std::lock_guard lock(bridge_state.mutex);
+    if (bridge_state.status != "live") {
+        return json_error(409, "Conflict", "RTL-SDR is not ready");
+    }
+    if (!is_broadcast_frequency(bridge_state.frequency_hz)) {
+        return json_error(422, "Unprocessable Content",
+                          "browser audio is limited to the 76-108 MHz broadcast band");
+    }
+
+    uint64_t start = after.value_or(
+        bridge_state.audio_end_sample > 4'096
+            ? bridge_state.audio_end_sample - 4'096
+            : bridge_state.audio_start_sample);
+    start = std::max(start, bridge_state.audio_start_sample);
+    start = std::min(start, bridge_state.audio_end_sample);
+    const size_t count = static_cast<size_t>(std::min<uint64_t>(
+        bridge_state.audio_end_sample - start, kMaximumAudioResponseSamples));
+    const uint64_t end = start + count;
+    const std::vector<std::pair<std::string, std::string>> headers{
+        {"Cache-Control", "no-store"},
+        {"X-Audio-Format", "s16le-mono"},
+        {"X-Audio-Sample-Rate", std::to_string(dsp::WfmDemodulator::kAudioSampleRateHz)},
+        {"X-Audio-Epoch", std::to_string(bridge_state.audio_epoch)},
+        {"X-Audio-Start-Sample", std::to_string(start)},
+        {"X-Audio-End-Sample", std::to_string(end)},
+    };
+    if (count == 0) {
+        return {204, "No Content", "application/octet-stream", "", headers};
+    }
+
+    std::string body(count * sizeof(int16_t), '\0');
+    const size_t offset = static_cast<size_t>(start - bridge_state.audio_start_sample);
+    for (size_t index = 0; index < count; ++index) {
+        const uint16_t sample = static_cast<uint16_t>(bridge_state.audio_samples[offset + index]);
+        body[index * 2] = static_cast<char>(sample & 0xffU);
+        body[index * 2 + 1] = static_cast<char>((sample >> 8U) & 0xffU);
+    }
+    return {200, "OK", "application/octet-stream", std::move(body), headers};
 }
 
 HttpResponse apply_control(std::string_view body) {
@@ -333,7 +516,7 @@ HttpResponse apply_control(std::string_view body) {
     if (gain_value) requested_control.gain_tenths_db.store(static_cast<int>(*gain_value));
     requested_control.revision.fetch_add(1);
     return {202, "Accepted", "application/json; charset=utf-8",
-            "{\"ok\":true,\"accepted\":true}"};
+            "{\"ok\":true,\"accepted\":true}", {}};
 }
 
 std::string mime_type(const std::filesystem::path& file) {
@@ -374,12 +557,13 @@ HttpResponse route_request(std::string_view method,
     const size_t query = target.find('?');
     const std::string_view path = target.substr(0, query);
     if (method == "GET" && path == "/healthz") {
-        return {200, "OK", "text/plain; charset=utf-8", "ok\n"};
+        return {200, "OK", "text/plain; charset=utf-8", "ok\n", {}};
     }
     if (method == "GET" && path == "/api/status") {
         return {200, "OK", "application/json; charset=utf-8", status_json(),
                 {{"Cache-Control", "no-store"}}};
     }
+    if (method == "GET" && path == "/api/audio") return audio_response(target);
     if (method == "POST" && path == "/api/control") return apply_control(body);
     if (method == "OPTIONS" && path.starts_with("/api/")) {
         return {204, "No Content", "text/plain", "", {{"Allow", "GET, POST, OPTIONS"}}};

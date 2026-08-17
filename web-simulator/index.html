@@ -30,7 +30,7 @@
       </div>
       <div class="intro-copy">
         <p>这是与 ARM64 应用交互模型同步的浏览器模拟器。你可以操作实体键、切换故障场景，并复制带状态的验收反馈。</p>
-        <p class="simulation-note">“真实 RTL-SDR”场景连接当前 USB 设备，实时传输射频频谱并控制频率与增益；浏览器音频暂未串流。其余场景用于可复现的产品设计和故障体验评审。</p>
+        <p class="simulation-note">“真实 RTL-SDR”场景通过本机局域网连接当前 USB 设备，实时传输射频频谱、WFM 广播音频并控制频率与增益。其余场景用于可复现的产品设计和故障体验评审。</p>
       </div>
     </section>
 
@@ -208,6 +208,23 @@
           </div>
         </div>
 
+        <section class="receiver-audio" aria-labelledby="receiver-audio-title">
+          <div class="receiver-audio-head">
+            <div>
+              <span class="group-label" id="receiver-audio-title">真机收音机</span>
+              <strong id="audio-player-status">点击播放后开始接收</strong>
+            </div>
+            <span class="audio-meter" id="audio-meter" aria-label="音频电平"><i></i></span>
+          </div>
+          <button class="primary-button audio-toggle" id="audio-toggle" type="button">▶ 播放真机声音</button>
+          <label class="volume-control" for="audio-volume">
+            <span>音量</span>
+            <input id="audio-volume" type="range" min="0" max="100" value="78">
+            <output id="audio-volume-value" for="audio-volume">78%</output>
+          </label>
+          <small>低延迟单声道 WFM · 仅限 76–108 MHz 广播频段</small>
+        </section>
+
         <dl class="state-readout" aria-label="当前模拟状态">
           <div><dt>频率</dt><dd id="readout-frequency">97.400 MHz</dd></div>
           <div><dt>步进</dt><dd id="readout-step">200 kHz</dd></div>
@@ -255,7 +272,7 @@
 
   <footer>
     <span>ZERO SDR / BROWSER PRODUCT SIMULATOR</span>
-    <span>公开资料外观 · 真机射频链路 · 音频暂未串流</span>
+    <span>公开资料外观 · 局域网真机射频与 WFM 音频</span>
   </footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
