@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#071018">
   <meta name="description" content="Zero SDR 浏览器交互模拟器，用于 Cardputer Zero 产品设计验收。">
   <title>Zero SDR · 产品验收模拟器</title>
-  <link rel="stylesheet" href="styles.css?v=20260818-audio1">
+  <link rel="stylesheet" href="styles.css?v=20260818-audio3">
 </head>
 <body>
   <a class="skip-link" href="#simulator">跳到模拟器</a>
@@ -18,6 +18,7 @@
     </a>
     <div class="header-meta">
       <span class="status-dot" id="global-live-status"><i></i>正在连接真机</span>
+      <button class="header-audio-button" id="header-audio-toggle" type="button" disabled>▶ 收听</button>
       <a href="https://github.com/k1412/cardputerzero-sdr" target="_blank" rel="noreferrer">查看源码 ↗</a>
     </div>
   </header>
@@ -217,12 +218,14 @@
             <span class="audio-meter" id="audio-meter" aria-label="音频电平"><i></i></span>
           </div>
           <button class="primary-button audio-toggle" id="audio-toggle" type="button">▶ 播放真机声音</button>
-          <label class="volume-control" for="audio-volume">
-            <span>音量</span>
-            <input id="audio-volume" type="range" min="0" max="100" value="78">
-            <output id="audio-volume-value" for="audio-volume">78%</output>
-          </label>
-          <small>低延迟单声道 WFM · 仅限 76–108 MHz 广播频段</small>
+          <audio id="radio-player" controls preload="none" playsinline></audio>
+          <div class="station-presets" aria-label="本机扫描到的强信号频点">
+            <button type="button" data-station="90.5">90.5</button>
+            <button type="button" data-station="94.5">94.5</button>
+            <button type="button" data-station="102.5">102.5</button>
+            <button type="button" data-station="106.1">106.1</button>
+          </div>
+          <small>浏览器原生 MP3 直播 · 仅限 76–108 MHz 广播频段</small>
         </section>
 
         <dl class="state-readout" aria-label="当前模拟状态">
@@ -276,6 +279,6 @@
   </footer>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="app.js?v=20260818-audio1" defer></script>
+  <script src="app.js?v=20260818-audio3" defer></script>
 </body>
 </html>

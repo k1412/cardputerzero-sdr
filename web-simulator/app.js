@@ -59,16 +59,13 @@ const hardware = {
   audioEpoch: 0,
   audioPeak: 0,
   audioRms: 0,
+  mp3Available: false,
 };
 const audioPlayer = {
-  enabled: false,
-  context: null,
-  gain: null,
-  cursor: null,
-  epoch: null,
-  nextStartTime: 0,
-  timer: 0,
-  sources: new Set(),
+  wanted: false,
+  playing: false,
+  restarting: false,
+  streamEpoch: 0,
   error: "",
 };
 
@@ -142,12 +139,16 @@ function render() {
   $("#readout-step").textContent = formatStep();
   $("#readout-gain").textContent = formatGain();
   $("#readout-audio").textContent = state.scenario === "device"
-    ? (audioPlayer.enabled ? (state.muted ? "静音" : "播放中") : (hardware.audioAvailable ? "待播放" : "不可用"))
+    ? (audioPlayer.playing ? (state.muted ? "静音" : "播放中") : (hardware.mp3Available ? "待播放" : "不可用"))
     : presentation.audio;
   $("#readout-device").textContent = hardware.connected
     ? `${hardware.deviceName || "RTL-SDR"} · ${hardware.status === "live" ? "在线" : "异常"}`
     : "未连接";
   $("#readout-iq").textContent = formatBytes(hardware.iqBytes);
+  $$("[data-station]").forEach((button) => {
+    const frequency = Number(button.dataset.station) * 1_000_000;
+    button.classList.toggle("active", Math.abs(state.frequencyHz - frequency) < 50_000);
+  });
   const liveStatus = $("#global-live-status");
   liveStatus.classList.toggle("offline", !hardware.connected || hardware.status !== "live");
   liveStatus.lastChild.textContent = hardware.connected && hardware.status === "live" ? " 真机在线" : " 真机连接中";
@@ -298,20 +299,24 @@ function formatBytes(bytes) {
 
 function audioSupportedNow() {
   return state.scenario === "device" && hardware.connected &&
-    hardware.status === "live" && hardware.audioAvailable;
+    hardware.status === "live" && hardware.audioAvailable && hardware.mp3Available;
 }
 
 function renderAudioPlayer() {
-  const button = $("#audio-toggle");
+  const buttons = [$("#audio-toggle"), $("#header-audio-toggle")].filter(Boolean);
   const status = $("#audio-player-status");
-  if (!button || !status) return;
+  if (!buttons.length || !status) return;
   const supported = audioSupportedNow();
-  button.disabled = !supported && !audioPlayer.enabled;
-  button.classList.toggle("is-playing", audioPlayer.enabled);
-  button.textContent = audioPlayer.enabled ? "■ 停止真机声音" : "▶ 播放真机声音";
+  buttons.forEach((button) => {
+    button.disabled = !supported && !audioPlayer.wanted;
+    button.classList.toggle("is-playing", audioPlayer.wanted);
+  });
+  $("#audio-toggle").textContent = audioPlayer.wanted ? "■ 停止真机声音" : "▶ 播放真机声音";
+  $("#header-audio-toggle").textContent = audioPlayer.wanted ? "■ 停止" : "▶ 收听";
   if (audioPlayer.error) status.textContent = audioPlayer.error;
-  else if (audioPlayer.enabled && state.muted) status.textContent = "正在接收 · 当前静音";
-  else if (audioPlayer.enabled) status.textContent = "正在播放 · 局域网低延迟";
+  else if (audioPlayer.playing && state.muted) status.textContent = "正在接收 · 当前静音";
+  else if (audioPlayer.playing) status.textContent = "正在播放 · 原生 MP3 直播";
+  else if (audioPlayer.wanted) status.textContent = "正在缓冲真机声音";
   else if (supported) status.textContent = "点击播放后开始接收";
   else if (hardware.connected && hardware.status === "live") status.textContent = "请调到 76–108 MHz";
   else status.textContent = "等待真机连接";
@@ -320,31 +325,21 @@ function renderAudioPlayer() {
 }
 
 function updateAudioGain() {
-  if (!audioPlayer.context || !audioPlayer.gain) return;
-  const volume = Number($("#audio-volume")?.value || 0) / 100;
-  const target = state.muted ? 0 : volume;
-  audioPlayer.gain.gain.setTargetAtTime(target, audioPlayer.context.currentTime, .015);
-}
-
-function clearScheduledAudio() {
-  for (const source of audioPlayer.sources) {
-    try { source.stop(); } catch { /* Source may already have ended. */ }
-  }
-  audioPlayer.sources.clear();
+  const player = $("#radio-player");
+  if (player) player.muted = state.muted;
 }
 
 function stopDeviceAudio(message = "已停止播放") {
-  audioPlayer.enabled = false;
-  window.clearTimeout(audioPlayer.timer);
-  clearScheduledAudio();
-  const context = audioPlayer.context;
-  audioPlayer.context = null;
-  audioPlayer.gain = null;
-  audioPlayer.cursor = null;
-  audioPlayer.epoch = null;
-  audioPlayer.nextStartTime = 0;
+  const player = $("#radio-player");
+  audioPlayer.wanted = false;
+  audioPlayer.playing = false;
+  audioPlayer.restarting = false;
+  if (player) {
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+  }
   audioPlayer.error = "";
-  if (context && context.state !== "closed") context.close().catch(() => {});
   setEvent(message);
   render();
 }
@@ -355,93 +350,39 @@ async function startDeviceAudio() {
     renderAudioPlayer();
     return;
   }
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) {
-    audioPlayer.error = "当前浏览器不支持 Web Audio";
-    renderAudioPlayer();
-    return;
-  }
+  const player = $("#radio-player");
   try {
-    const context = new AudioContextClass({ latencyHint: "interactive" });
-    const gain = context.createGain();
-    gain.connect(context.destination);
-    audioPlayer.context = context;
-    audioPlayer.gain = gain;
-    audioPlayer.enabled = true;
-    audioPlayer.cursor = null;
-    audioPlayer.epoch = null;
-    audioPlayer.nextStartTime = context.currentTime + .1;
+    audioPlayer.restarting = true;
+    audioPlayer.wanted = true;
+    audioPlayer.playing = false;
+    audioPlayer.streamEpoch = hardware.audioEpoch;
     audioPlayer.error = "";
     state.muted = false;
+    player.src = `/api/radio.mp3?epoch=${hardware.audioEpoch}&t=${Date.now()}`;
+    player.load();
     updateAudioGain();
-    await context.resume();
-    setEvent("真机 WFM 音频已开始播放。");
+    await player.play();
+    audioPlayer.restarting = false;
+    setEvent("真机 WFM MP3 直播已开始播放。");
     render();
-    pumpDeviceAudio();
   } catch (error) {
-    audioPlayer.enabled = false;
-    audioPlayer.error = `无法启动声音：${error.message}`;
+    audioPlayer.restarting = false;
+    audioPlayer.wanted = false;
+    audioPlayer.playing = false;
+    audioPlayer.error = `点原生播放键重试：${error.message}`;
     renderAudioPlayer();
   }
 }
 
-async function pumpDeviceAudio() {
-  if (!audioPlayer.enabled || !audioPlayer.context) return;
-  try {
-    const cursor = audioPlayer.cursor;
-    const response = await fetch(cursor === null ? "/api/audio" : `/api/audio?after=${cursor}`, {
-      cache: "no-store",
-    });
-    if (response.status === 204) {
-      audioPlayer.timer = window.setTimeout(pumpDeviceAudio, 35);
-      return;
-    }
-    if (!response.ok) {
-      const payload = await response.json().catch(() => ({}));
-      throw new Error(payload.error || `音频接口 HTTP ${response.status}`);
-    }
-    const sampleRate = Number(response.headers.get("X-Audio-Sample-Rate")) || 32_000;
-    const epoch = Number(response.headers.get("X-Audio-Epoch"));
-    const start = Number(response.headers.get("X-Audio-Start-Sample"));
-    const end = Number(response.headers.get("X-Audio-End-Sample"));
-    const bytes = await response.arrayBuffer();
-    if (bytes.byteLength < 2 || bytes.byteLength % 2 !== 0 || !Number.isFinite(end)) {
-      throw new Error("收到无效音频数据");
-    }
-
-    if (audioPlayer.epoch !== epoch || (cursor !== null && Number.isFinite(start) && start > cursor)) {
-      clearScheduledAudio();
-      audioPlayer.epoch = epoch;
-      audioPlayer.nextStartTime = audioPlayer.context.currentTime + .1;
-    }
-    audioPlayer.cursor = end;
-    const view = new DataView(bytes);
-    const buffer = audioPlayer.context.createBuffer(1, bytes.byteLength / 2, sampleRate);
-    const channel = buffer.getChannelData(0);
-    for (let index = 0; index < channel.length; index++) {
-      channel[index] = view.getInt16(index * 2, true) / 32_768;
-    }
-    const source = audioPlayer.context.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audioPlayer.gain);
-    source.onended = () => audioPlayer.sources.delete(source);
-    audioPlayer.sources.add(source);
-    const minimumStart = audioPlayer.context.currentTime + .07;
-    if (audioPlayer.nextStartTime < minimumStart ||
-        audioPlayer.nextStartTime > audioPlayer.context.currentTime + 1) {
-      audioPlayer.nextStartTime = minimumStart;
-    }
-    source.start(audioPlayer.nextStartTime);
-    audioPlayer.nextStartTime += buffer.duration;
-    audioPlayer.error = "";
-    renderAudioPlayer();
-    const bufferedSeconds = audioPlayer.nextStartTime - audioPlayer.context.currentTime;
-    audioPlayer.timer = window.setTimeout(pumpDeviceAudio, bufferedSeconds > .34 ? 110 : 38);
-  } catch (error) {
-    audioPlayer.error = `音频重连中：${error.message}`;
-    renderAudioPlayer();
-    audioPlayer.timer = window.setTimeout(pumpDeviceAudio, 350);
-  }
+function scheduleAudioRestart() {
+  if (!audioPlayer.wanted || audioPlayer.restarting) return;
+  audioPlayer.restarting = true;
+  window.setTimeout(async () => {
+    audioPlayer.restarting = false;
+    if (!audioPlayer.wanted || !audioSupportedNow()) return;
+    try { await startDeviceAudio(); }
+    catch { /* startDeviceAudio reports the browser error. */ }
+  }, 500);
 }
 
 async function sendDeviceControl(fields) {
@@ -461,6 +402,7 @@ async function sendDeviceControl(fields) {
 async function pollHardware() {
   const previousStatus = hardware.status;
   const wasConnected = hardware.connected;
+  const previousAudioEpoch = hardware.audioEpoch;
   try {
     const response = await fetch("/api/status", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -481,6 +423,7 @@ async function pollHardware() {
     hardware.audioEpoch = payload.audio_epoch || 0;
     hardware.audioPeak = payload.audio_peak || 0;
     hardware.audioRms = payload.audio_rms || 0;
+    hardware.mp3Available = Boolean(payload.mp3_available);
     if (state.scenario === "device") {
       state.frequencyHz = payload.frequency_hz || state.frequencyHz;
       state.autoGain = Boolean(payload.automatic_gain);
@@ -491,11 +434,14 @@ async function pollHardware() {
         ? `真机已连接：${hardware.deviceName}，${(hardware.sampleRateHz / 1_000_000).toFixed(3)} MS/s。`
         : `真机状态：${hardware.detail || hardware.status}。`);
     }
+    if (audioPlayer.wanted && previousAudioEpoch &&
+        previousAudioEpoch !== hardware.audioEpoch) scheduleAudioRestart();
   } catch (error) {
     hardware.connected = false;
     hardware.status = "connecting";
     hardware.detail = error.message;
     hardware.audioAvailable = false;
+    hardware.mp3Available = false;
     if (wasConnected) setEvent("真机桥已断开，正在自动重连。");
   }
   render();
@@ -611,19 +557,52 @@ function setup() {
     button.addEventListener("lostpointercapture", stop);
   });
 
-  $("#scenario").addEventListener("change", (event) => { state.scenario = event.target.value; if (state.scenario !== "device" && audioPlayer.enabled) stopDeviceAudio("已停止真机声音。"); setEvent(`接收场景切换为“${event.target.selectedOptions[0].text}”。`); if (state.scenario === "device" && hardware.connected) { state.frequencyHz = state.frequencyHz; sendDeviceControl({ frequency_hz: state.frequencyHz, automatic_gain: state.autoGain, gain_tenths_db: state.gain }); } render(); });
+  $("#scenario").addEventListener("change", (event) => { state.scenario = event.target.value; if (state.scenario !== "device" && audioPlayer.wanted) stopDeviceAudio("已停止真机声音。"); setEvent(`接收场景切换为“${event.target.selectedOptions[0].text}”。`); if (state.scenario === "device" && hardware.connected) { state.frequencyHz = state.frequencyHz; sendDeviceControl({ frequency_hz: state.frequencyHz, automatic_gain: state.autoGain, gain_tenths_db: state.gain }); } render(); });
   $("#locale").addEventListener("change", (event) => { state.locale = event.target.value; setEvent(`界面语言切换为 ${localeName()}。`); render(); });
   $("#theme").addEventListener("change", (event) => { state.dark = event.target.value === "dark"; setEvent(`切换为${state.dark ? "深色" : "浅色"}主题。`); render(); });
   $$('[data-page]').forEach((button) => button.addEventListener("click", () => { state.page = button.dataset.page; if (state.page === "direct" && !state.direct) state.direct = "103.9"; state.directInvalid = false; setEvent(`切换到${button.textContent}页面。`); render(); }));
-  $("#reset-button").addEventListener("click", () => { if (audioPlayer.enabled) stopDeviceAudio(); state = { ...DEFAULT_STATE }; setEvent("已恢复模拟器默认状态。"); render(); showToast("已恢复默认状态"); });
+  $("#reset-button").addEventListener("click", () => { if (audioPlayer.wanted) stopDeviceAudio(); state = { ...DEFAULT_STATE }; setEvent("已恢复模拟器默认状态。"); render(); showToast("已恢复默认状态"); });
   $("#copy-link").addEventListener("click", () => copyText(location.href, "当前状态链接已复制"));
-  $("#audio-toggle").addEventListener("click", () => {
-    if (audioPlayer.enabled) stopDeviceAudio();
-    else startDeviceAudio();
+  [$("#audio-toggle"), $("#header-audio-toggle")].forEach((button) => {
+    button.addEventListener("click", () => {
+      if (audioPlayer.wanted) stopDeviceAudio();
+      else startDeviceAudio();
+    });
   });
-  $("#audio-volume").addEventListener("input", (event) => {
-    $("#audio-volume-value").value = `${event.target.value}%`;
-    updateAudioGain();
+  $$("[data-station]").forEach((button) => button.addEventListener("click", () => {
+    state.frequencyHz = Math.round(Number(button.dataset.station) * 1_000_000);
+    setEvent(`切换到本机强信号 ${button.dataset.station} MHz。`);
+    sendDeviceControl({ frequency_hz: state.frequencyHz });
+    render();
+  }));
+  const radioPlayer = $("#radio-player");
+  radioPlayer.addEventListener("playing", () => {
+    audioPlayer.wanted = true;
+    audioPlayer.playing = true;
+    audioPlayer.restarting = false;
+    audioPlayer.error = "";
+    render();
+  });
+  radioPlayer.addEventListener("waiting", () => {
+    audioPlayer.playing = false;
+    renderAudioPlayer();
+  });
+  radioPlayer.addEventListener("pause", () => {
+    audioPlayer.playing = false;
+    if (!audioPlayer.restarting) audioPlayer.wanted = false;
+    renderAudioPlayer();
+  });
+  radioPlayer.addEventListener("ended", () => {
+    audioPlayer.playing = false;
+    scheduleAudioRestart();
+  });
+  radioPlayer.addEventListener("error", () => {
+    audioPlayer.playing = false;
+    if (audioPlayer.wanted) {
+      audioPlayer.error = "直播断开，正在自动重连";
+      scheduleAudioRestart();
+    }
+    renderAudioPlayer();
   });
 
   const notes = $("#review-notes");
@@ -639,14 +618,10 @@ function setup() {
   });
 
   screen.addEventListener("click", () => screen.focus());
-  document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && audioPlayer.enabled && audioPlayer.context?.state === "suspended") {
-      audioPlayer.context.resume().catch(() => {});
-    }
-  });
   window.addEventListener("pagehide", () => {
-    window.clearTimeout(audioPlayer.timer);
-    clearScheduledAudio();
+    radioPlayer.pause();
+    radioPlayer.removeAttribute("src");
+    radioPlayer.load();
   });
   animate();
   pollHardware();

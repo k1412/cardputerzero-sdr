@@ -11,6 +11,7 @@
 #include <chrono>
 #include <cmath>
 #include <csignal>
+#include <condition_variable>
 #include <cstdint>
 #include <cstdlib>
 #include <cstring>
@@ -28,6 +29,7 @@
 #include <vector>
 
 #include <arpa/inet.h>
+#include <dlfcn.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -38,13 +40,14 @@ using namespace std::chrono_literals;
 
 constexpr uint32_t kMinimumFrequencyHz = 22'000'000;
 constexpr uint32_t kMaximumFrequencyHz = 948'600'000;
-constexpr uint32_t kDefaultFrequencyHz = 97'400'000;
+constexpr uint32_t kDefaultFrequencyHz = 106'100'000;
 constexpr uint32_t kSampleRateHz = 2'048'000;
 constexpr uint32_t kBroadcastMinimumFrequencyHz = 76'000'000;
 constexpr uint32_t kBroadcastMaximumFrequencyHz = 108'000'000;
 constexpr size_t kIqBlockBytes = 16 * 16'384;
 constexpr size_t kAudioRingSamples = dsp::WfmDemodulator::kAudioSampleRateHz * 3;
 constexpr size_t kMaximumAudioResponseSamples = 8'192;
+constexpr size_t kMp3RingBytes = 256 * 1'024;
 constexpr uint16_t kDefaultPort = 18'117;
 
 std::atomic_bool running{true};
@@ -56,10 +59,115 @@ std::mutex audio_rate_mutex;
 std::chrono::steady_clock::time_point audio_window_started{
     std::chrono::steady_clock::now()};
 unsigned audio_requests_in_window{0};
+std::atomic_uint active_mp3_streams{0};
+std::condition_variable audio_condition;
 
 void handle_signal(int) {
     running.store(false);
+    audio_condition.notify_all();
 }
+
+class Mp3Encoder {
+public:
+    ~Mp3Encoder() {
+        close_encoder();
+        if (library_) dlclose(library_);
+    }
+
+    bool reset(std::string& error) {
+        close_encoder();
+        if (!load_library(error)) return false;
+        encoder_ = lame_init_();
+        if (!encoder_) {
+            error = "lame_init failed";
+            return false;
+        }
+        const bool configured =
+            lame_set_in_samplerate_(encoder_, dsp::WfmDemodulator::kAudioSampleRateHz) == 0 &&
+            lame_set_out_samplerate_(encoder_, dsp::WfmDemodulator::kAudioSampleRateHz) == 0 &&
+            lame_set_num_channels_(encoder_, 1) == 0 &&
+            lame_set_mode_(encoder_, 3) == 0 &&
+            lame_set_brate_(encoder_, 64) == 0 &&
+            lame_set_quality_(encoder_, 5) == 0 &&
+            lame_init_params_(encoder_) == 0;
+        if (!configured) {
+            error = "libmp3lame configuration failed";
+            close_encoder();
+            return false;
+        }
+        error.clear();
+        return true;
+    }
+
+    std::vector<uint8_t> encode(const std::vector<int16_t>& samples, std::string& error) {
+        if (!encoder_ || samples.empty()) return {};
+        std::vector<uint8_t> output(static_cast<size_t>(
+            std::ceil(1.25 * static_cast<double>(samples.size()))) + 7'200);
+        const int encoded = lame_encode_buffer_(
+            encoder_, samples.data(), samples.data(), static_cast<int>(samples.size()),
+            output.data(), static_cast<int>(output.size()));
+        if (encoded < 0) {
+            error = "libmp3lame encode failed: " + std::to_string(encoded);
+            return {};
+        }
+        output.resize(static_cast<size_t>(encoded));
+        return output;
+    }
+
+private:
+    using Encoder = void*;
+    using InitFn = Encoder (*)();
+    using SetIntFn = int (*)(Encoder, int);
+    using InitParamsFn = int (*)(Encoder);
+    using EncodeFn = int (*)(Encoder, const short*, const short*, int, unsigned char*, int);
+    using CloseFn = int (*)(Encoder);
+
+    template <typename Function>
+    bool load_symbol(Function& target, const char* name, std::string& error) {
+        target = reinterpret_cast<Function>(dlsym(library_, name));
+        if (target) return true;
+        error = std::string("missing libmp3lame symbol: ") + name;
+        return false;
+    }
+
+    bool load_library(std::string& error) {
+        if (library_) return true;
+        library_ = dlopen("libmp3lame.so.0", RTLD_NOW | RTLD_LOCAL);
+        if (!library_) {
+            const char* detail = dlerror();
+            error = detail ? detail : "libmp3lame is unavailable";
+            return false;
+        }
+        return load_symbol(lame_init_, "lame_init", error) &&
+               load_symbol(lame_set_in_samplerate_, "lame_set_in_samplerate", error) &&
+               load_symbol(lame_set_out_samplerate_, "lame_set_out_samplerate", error) &&
+               load_symbol(lame_set_num_channels_, "lame_set_num_channels", error) &&
+               load_symbol(lame_set_mode_, "lame_set_mode", error) &&
+               load_symbol(lame_set_brate_, "lame_set_brate", error) &&
+               load_symbol(lame_set_quality_, "lame_set_quality", error) &&
+               load_symbol(lame_init_params_, "lame_init_params", error) &&
+               load_symbol(lame_encode_buffer_, "lame_encode_buffer", error) &&
+               load_symbol(lame_close_, "lame_close", error);
+    }
+
+    void close_encoder() {
+        if (encoder_ && lame_close_) lame_close_(encoder_);
+        encoder_ = nullptr;
+    }
+
+    void* library_{nullptr};
+    Encoder encoder_{nullptr};
+    InitFn lame_init_{nullptr};
+    SetIntFn lame_set_in_samplerate_{nullptr};
+    SetIntFn lame_set_out_samplerate_{nullptr};
+    SetIntFn lame_set_num_channels_{nullptr};
+    SetIntFn lame_set_mode_{nullptr};
+    SetIntFn lame_set_brate_{nullptr};
+    SetIntFn lame_set_quality_{nullptr};
+    InitParamsFn lame_init_params_{nullptr};
+    EncodeFn lame_encode_buffer_{nullptr};
+    CloseFn lame_close_{nullptr};
+};
 
 std::string json_escape(std::string_view input) {
     std::ostringstream out;
@@ -84,6 +192,11 @@ std::string json_escape(std::string_view input) {
     return out.str();
 }
 
+struct Mp3Chunk {
+    uint64_t start_byte{0};
+    std::vector<uint8_t> data;
+};
+
 struct BridgeState {
     mutable std::mutex mutex;
     std::string status{"connecting"};
@@ -106,6 +219,16 @@ struct BridgeState {
     uint64_t audio_epoch{1};
     uint32_t audio_peak{0};
     uint32_t audio_rms{0};
+    uint64_t audio_http_requests{0};
+    uint64_t audio_http_bytes{0};
+    std::chrono::steady_clock::time_point audio_last_request_at{};
+    std::deque<Mp3Chunk> mp3_chunks;
+    uint64_t mp3_start_byte{0};
+    uint64_t mp3_end_byte{0};
+    size_t mp3_buffered_bytes{0};
+    bool mp3_available{false};
+    std::string mp3_error;
+    uint64_t mp3_stream_connections{0};
     std::chrono::steady_clock::time_point started_at{std::chrono::steady_clock::now()};
 };
 
@@ -129,6 +252,9 @@ void reset_audio_locked() {
     bridge_state.audio_start_sample = bridge_state.audio_end_sample;
     bridge_state.audio_peak = 0;
     bridge_state.audio_rms = 0;
+    bridge_state.mp3_chunks.clear();
+    bridge_state.mp3_start_byte = bridge_state.mp3_end_byte;
+    bridge_state.mp3_buffered_bytes = 0;
     ++bridge_state.audio_epoch;
 }
 
@@ -153,12 +279,31 @@ void append_audio_locked(const std::vector<int16_t>& samples) {
     }
 }
 
+void append_mp3_locked(std::vector<uint8_t> bytes) {
+    if (bytes.empty()) return;
+    const size_t size = bytes.size();
+    bridge_state.mp3_chunks.push_back({bridge_state.mp3_end_byte, std::move(bytes)});
+    bridge_state.mp3_end_byte += size;
+    bridge_state.mp3_buffered_bytes += size;
+    while (bridge_state.mp3_buffered_bytes > kMp3RingBytes &&
+           bridge_state.mp3_chunks.size() > 1) {
+        bridge_state.mp3_buffered_bytes -= bridge_state.mp3_chunks.front().data.size();
+        bridge_state.mp3_chunks.pop_front();
+    }
+    bridge_state.mp3_start_byte = bridge_state.mp3_chunks.empty()
+        ? bridge_state.mp3_end_byte
+        : bridge_state.mp3_chunks.front().start_byte;
+}
+
 void publish_status(std::string status, std::string detail = {}, std::string device_name = {}) {
-    std::lock_guard lock(bridge_state.mutex);
-    if (status != "live" && bridge_state.status == "live") reset_audio_locked();
-    bridge_state.status = std::move(status);
-    bridge_state.detail = std::move(detail);
-    if (!device_name.empty()) bridge_state.device_name = std::move(device_name);
+    {
+        std::lock_guard lock(bridge_state.mutex);
+        if (status != "live" && bridge_state.status == "live") reset_audio_locked();
+        bridge_state.status = std::move(status);
+        bridge_state.detail = std::move(detail);
+        if (!device_name.empty()) bridge_state.device_name = std::move(device_name);
+    }
+    audio_condition.notify_all();
 }
 
 void interruptible_pause(std::chrono::milliseconds duration) {
@@ -211,6 +356,9 @@ void receiver_loop() {
             continue;
         }
 
+        Mp3Encoder mp3_encoder;
+        std::string mp3_error;
+        bool mp3_ready = mp3_encoder.reset(mp3_error);
         {
             std::lock_guard lock(bridge_state.mutex);
             bridge_state.status = "live";
@@ -221,8 +369,11 @@ void receiver_loop() {
             bridge_state.gain_tenths_db = initial_gain;
             bridge_state.supported_gains = gains;
             reset_audio_locked();
+            bridge_state.mp3_available = mp3_ready;
+            bridge_state.mp3_error = mp3_error;
             ++bridge_state.reconnects;
         }
+        audio_condition.notify_all();
 
         dsp::IqSpectrum spectrum_processor;
         dsp::WfmDemodulator audio_processor;
@@ -250,6 +401,13 @@ void receiver_loop() {
                     reset_audio_locked();
                 }
                 audio_processor.reset();
+                mp3_ready = mp3_encoder.reset(mp3_error);
+                {
+                    std::lock_guard lock(bridge_state.mutex);
+                    bridge_state.mp3_available = mp3_ready;
+                    bridge_state.mp3_error = mp3_error;
+                }
+                audio_condition.notify_all();
                 applied_frequency = frequency;
                 applied_revision = revision;
             }
@@ -269,6 +427,8 @@ void receiver_loop() {
             const auto audio = is_broadcast_frequency(applied_frequency)
                 ? audio_processor.process(iq.data(), bytes_read)
                 : std::vector<int16_t>{};
+            const auto mp3 = mp3_ready ? mp3_encoder.encode(audio, mp3_error)
+                                       : std::vector<uint8_t>{};
             {
                 std::lock_guard lock(bridge_state.mutex);
                 bridge_state.status = "live";
@@ -278,7 +438,10 @@ void receiver_loop() {
                 ++bridge_state.iq_blocks;
                 bridge_state.iq_bytes += bytes_read;
                 append_audio_locked(audio);
+                append_mp3_locked(mp3);
+                if (!mp3_error.empty()) bridge_state.mp3_error = mp3_error;
             }
+            if (!mp3.empty()) audio_condition.notify_all();
         }
 
         radio.close();
@@ -288,8 +451,13 @@ void receiver_loop() {
 
 std::string status_json() {
     std::lock_guard lock(bridge_state.mutex);
+    const auto now = std::chrono::steady_clock::now();
     const auto uptime = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::steady_clock::now() - bridge_state.started_at).count();
+        now - bridge_state.started_at).count();
+    const auto audio_request_age = bridge_state.audio_http_requests == 0
+        ? -1LL
+        : std::chrono::duration_cast<std::chrono::milliseconds>(
+              now - bridge_state.audio_last_request_at).count();
     std::ostringstream out;
     out << "{\"schema\":\"zero-sdr-bridge-v1\",\"status\":\""
         << json_escape(bridge_state.status) << "\",\"detail\":\""
@@ -315,6 +483,14 @@ std::string status_json() {
         << ",\"audio_chunks\":" << bridge_state.audio_chunks
         << ",\"audio_peak\":" << bridge_state.audio_peak
         << ",\"audio_rms\":" << bridge_state.audio_rms
+        << ",\"audio_http_requests\":" << bridge_state.audio_http_requests
+        << ",\"audio_http_bytes\":" << bridge_state.audio_http_bytes
+        << ",\"audio_last_request_age_ms\":" << audio_request_age
+        << ",\"mp3_available\":" << (bridge_state.mp3_available ? "true" : "false")
+        << ",\"mp3_error\":\"" << json_escape(bridge_state.mp3_error) << "\""
+        << ",\"mp3_buffered_bytes\":" << bridge_state.mp3_buffered_bytes
+        << ",\"mp3_stream_connections\":" << bridge_state.mp3_stream_connections
+        << ",\"mp3_active_streams\":" << active_mp3_streams.load()
         << ",\"uptime_ms\":" << uptime << ",\"supported_gains_tenths_db\":[";
     for (size_t index = 0; index < bridge_state.supported_gains.size(); ++index) {
         if (index) out << ',';
@@ -453,6 +629,8 @@ HttpResponse audio_response(std::string_view target) {
     }
 
     std::lock_guard lock(bridge_state.mutex);
+    ++bridge_state.audio_http_requests;
+    bridge_state.audio_last_request_at = std::chrono::steady_clock::now();
     if (bridge_state.status != "live") {
         return json_error(409, "Conflict", "RTL-SDR is not ready");
     }
@@ -489,6 +667,7 @@ HttpResponse audio_response(std::string_view target) {
         body[index * 2] = static_cast<char>(sample & 0xffU);
         body[index * 2 + 1] = static_cast<char>((sample >> 8U) & 0xffU);
     }
+    bridge_state.audio_http_bytes += body.size();
     return {200, "OK", "application/octet-stream", std::move(body), headers};
 }
 
@@ -579,6 +758,15 @@ HttpResponse route_request(std::string_view method,
                                    : "public, max-age=604800"}}};
 }
 
+bool write_all(int client, std::string_view data) {
+    while (!data.empty()) {
+        const ssize_t written = ::send(client, data.data(), data.size(), MSG_NOSIGNAL);
+        if (written <= 0) return false;
+        data.remove_prefix(static_cast<size_t>(written));
+    }
+    return true;
+}
+
 void send_response(int client, const HttpResponse& response) {
     std::ostringstream header;
     header << "HTTP/1.1 " << response.status << ' ' << response.reason << "\r\n"
@@ -592,15 +780,98 @@ void send_response(int client, const HttpResponse& response) {
     for (const auto& [name, value] : response.headers) header << name << ": " << value << "\r\n";
     header << "\r\n";
     const std::string head = header.str();
-    auto write_all = [client](std::string_view data) {
-        while (!data.empty()) {
-            const ssize_t written = ::send(client, data.data(), data.size(), MSG_NOSIGNAL);
-            if (written <= 0) return;
-            data.remove_prefix(static_cast<size_t>(written));
+    if (write_all(client, head)) write_all(client, response.body);
+}
+
+void stream_mp3(int client) {
+    constexpr unsigned kMaximumConcurrentStreams = 4;
+    const unsigned previous = active_mp3_streams.fetch_add(1);
+    if (previous >= kMaximumConcurrentStreams) {
+        active_mp3_streams.fetch_sub(1);
+        send_response(client, json_error(429, "Too Many Requests", "too many audio streams"));
+        return;
+    }
+    struct StreamGuard {
+        ~StreamGuard() { active_mp3_streams.fetch_sub(1); }
+    } guard;
+
+    uint64_t epoch = 0;
+    uint64_t cursor = 0;
+    {
+        std::lock_guard lock(bridge_state.mutex);
+        if (bridge_state.status != "live" ||
+            !is_broadcast_frequency(bridge_state.frequency_hz)) {
+            send_response(client, json_error(409, "Conflict", "WFM radio is not ready"));
+            return;
         }
-    };
-    write_all(head);
-    write_all(response.body);
+        if (!bridge_state.mp3_available) {
+            send_response(client, json_error(503, "Service Unavailable",
+                                             bridge_state.mp3_error.empty()
+                                                 ? "MP3 encoder is unavailable"
+                                                 : bridge_state.mp3_error));
+            return;
+        }
+        epoch = bridge_state.audio_epoch;
+        const uint64_t target = bridge_state.mp3_end_byte > 8'192
+            ? bridge_state.mp3_end_byte - 8'192
+            : bridge_state.mp3_start_byte;
+        cursor = bridge_state.mp3_start_byte;
+        for (const auto& chunk : bridge_state.mp3_chunks) {
+            if (chunk.start_byte + chunk.data.size() > target) {
+                cursor = chunk.start_byte;
+                break;
+            }
+        }
+        ++bridge_state.mp3_stream_connections;
+    }
+
+    const std::string header =
+        "HTTP/1.1 200 OK\r\n"
+        "Content-Type: audio/mpeg\r\n"
+        "Cache-Control: no-store, no-cache\r\n"
+        "Transfer-Encoding: chunked\r\n"
+        "Connection: close\r\n"
+        "Accept-Ranges: none\r\n"
+        "X-Content-Type-Options: nosniff\r\n"
+        "icy-name: Zero SDR LAN Radio\r\n"
+        "icy-br: 64\r\n\r\n";
+    if (!write_all(client, header)) return;
+
+    while (running.load()) {
+        std::string batch;
+        {
+            std::unique_lock lock(bridge_state.mutex);
+            audio_condition.wait_for(lock, 1s, [&] {
+                return !running.load() || bridge_state.audio_epoch != epoch ||
+                       bridge_state.status != "live" ||
+                       bridge_state.mp3_end_byte > cursor;
+            });
+            if (!running.load() || bridge_state.audio_epoch != epoch ||
+                bridge_state.status != "live") {
+                break;
+            }
+            if (cursor < bridge_state.mp3_start_byte) cursor = bridge_state.mp3_start_byte;
+            for (const auto& chunk : bridge_state.mp3_chunks) {
+                const uint64_t chunk_end = chunk.start_byte + chunk.data.size();
+                if (chunk_end <= cursor) continue;
+                const size_t offset = cursor > chunk.start_byte
+                    ? static_cast<size_t>(cursor - chunk.start_byte)
+                    : 0;
+                batch.append(reinterpret_cast<const char*>(chunk.data.data() + offset),
+                             chunk.data.size() - offset);
+                cursor = chunk_end;
+            }
+        }
+        if (!batch.empty()) {
+            std::ostringstream prefix;
+            prefix << std::hex << batch.size() << "\r\n";
+            if (!write_all(client, prefix.str()) || !write_all(client, batch) ||
+                !write_all(client, "\r\n")) {
+                return;
+            }
+        }
+    }
+    write_all(client, "0\r\n\r\n");
 }
 
 void handle_client(int client, const std::filesystem::path& web_root) {
@@ -631,6 +902,7 @@ void handle_client(int client, const std::filesystem::path& web_root) {
     }
 
     const size_t line_end = request.find("\r\n");
+    if (request.empty()) return;
     if (line_end == std::string::npos) {
         send_response(client, json_error(400, "Bad Request", "malformed request"));
         return;
@@ -644,6 +916,12 @@ void handle_client(int client, const std::filesystem::path& web_root) {
     const std::string_view body = headers_end == std::string::npos
         ? std::string_view{}
         : std::string_view(request).substr(headers_end + 4);
+    const size_t query = target.find('?');
+    const std::string_view path(target.data(), query == std::string::npos ? target.size() : query);
+    if (method == "GET" && path == "/api/radio.mp3") {
+        stream_mp3(client);
+        return;
+    }
     send_response(client, route_request(method, target, body, web_root));
 }
 

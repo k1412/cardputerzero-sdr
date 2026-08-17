@@ -36,9 +36,9 @@ ZERO_SDR_WEB_ROOT="$PWD/web-simulator" \
   ./build/web-simulator/zero-sdr-bridge
 ```
 
-The bridge listens on `0.0.0.0:18117` by default. It serves the static simulator, `GET /api/status`, `GET /api/audio`, bounded `POST /api/control`, and `/healthz`.
+The bridge listens on `0.0.0.0:18117` by default. It serves the static simulator, `GET /api/status`, native `GET /api/radio.mp3` streaming, diagnostic `GET /api/audio` PCM blocks, bounded `POST /api/control`, and `/healthz`. The native bridge loads the host's `libmp3lame.so.0` at runtime for the browser stream.
 
-The live bridge carries spectrum data, bounded frequency/gain controls, and mono 32 kHz WFM audio. Open `http://<host-lan-ip>:18117`, select a frequency in the 76–108 MHz broadcast band, and press **播放真机声音**. Browsers require this click before audio may start. Audio is delivered as short same-origin signed 16-bit PCM blocks from `GET /api/audio`; the bridge keeps only three seconds in memory and does not record it.
+The live bridge carries spectrum data, bounded frequency/gain controls, and a mono 32 kHz WFM source encoded as a 64 kbps MP3 stream. Open `http://<host-lan-ip>:18117`, select a frequency in the 76–108 MHz broadcast band, and press **播放真机声音** or the browser-native play control. Browsers require this click before audio may start. The bridge keeps only bounded in-memory buffers and does not record the stream.
 
 The service is intended for a trusted LAN or private tailnet and is not exposed through a public reverse proxy. Control requests are globally limited to 30 requests per second and audio requests to 120 requests per second.
 

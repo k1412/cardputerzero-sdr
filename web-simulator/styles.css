@@ -128,6 +128,9 @@ a { color: inherit; }
 .header-meta a:hover { color: var(--ink); border-color: var(--accent); }
 .status-dot { display: flex; align-items: center; gap: 8px; }
 .status-dot i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+.header-audio-button { min-height: 32px; padding: 0 12px; border: 1px solid var(--accent); border-radius: 3px; background: transparent; color: var(--accent); font-size: 12px; cursor: pointer; }
+.header-audio-button.is-playing { border-color: var(--amber); color: var(--amber); }
+.header-audio-button:disabled { border-color: var(--line); color: var(--muted); cursor: not-allowed; }
 
 main { width: min(1440px, calc(100% - 48px)); margin: 0 auto; }
 
@@ -362,9 +365,10 @@ select:focus { border-color: var(--accent); }
 .audio-toggle { width: 100%; margin-top: 14px; }
 .audio-toggle.is-playing { border-color: var(--amber); background: transparent; color: var(--amber); }
 .audio-toggle:disabled { border-color: var(--line-bright); background: var(--surface); color: var(--muted); cursor: not-allowed; }
-.volume-control { margin-top: 12px; display: grid; grid-template-columns: auto 1fr 36px; align-items: center; gap: 9px; color: var(--muted); font-size: 10px; }
-.volume-control input { width: 100%; accent-color: var(--accent); }
-.volume-control output { color: var(--ink); text-align: right; font-variant-numeric: tabular-nums; }
+.receiver-audio audio { width: 100%; height: 34px; margin-top: 12px; color-scheme: dark; }
+.station-presets { margin-top: 10px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; }
+.station-presets button { min-width: 0; height: 30px; padding: 0; border: 1px solid var(--line-bright); border-radius: 3px; background: transparent; color: var(--muted); font-size: 10px; cursor: pointer; }
+.station-presets button:hover, .station-presets button.active { border-color: var(--accent); color: var(--accent); background: rgb(53 220 200 / 8%); }
 
 .state-readout { margin: 26px 0 0; padding: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .state-readout div { display: flex; justify-content: space-between; padding: 6px 0; }
@@ -408,6 +412,7 @@ footer { width: min(1440px, calc(100% - 48px)); min-height: 74px; margin: auto; 
   .site-header, main, footer { width: min(100% - 28px, 1440px); }
   .header-meta { gap: 14px; }
   .status-dot { display: none; }
+  .header-audio-button { position: fixed; z-index: 70; right: 14px; bottom: 14px; min-height: 46px; padding: 0 18px; background: #071513; box-shadow: 0 10px 35px rgb(0 0 0 / 45%); }
   .intro { min-height: auto; grid-template-columns: 1fr; gap: 28px; padding: 54px 0 40px; }
   h1 { font-size: clamp(40px, 13vw, 64px); }
   .workspace { margin-left: -14px; margin-right: -14px; border-left: 0; border-right: 0; }
