@@ -8,6 +8,10 @@
 
 Zero SDR is an open-source, keyboard-first RTL-SDR receiver for Cardputer Zero. The UI is rendered at the device's native 320×170 resolution and is designed around its physical `F/X/Z/C`, Enter, and Esc controls.
 
+## Online product-review simulator
+
+[Open the browser simulator](https://zero-sdr-simulator.k1412.top/) to operate the 320×170 UI inside a shell based on public Cardputer Zero product information, switch review states, and capture structured feedback. Its “Real RTL-SDR” scenario connects to the development host's USB receiver for live spectrum and bounded frequency/gain control; browser audio is not streamed yet. This is a product-design review surface, not a substitute for physical Cardputer Zero P0 release evidence.
+
 ![Radio spectrum and waterfall](screenshots/radio-dark.png)
 
 > [!IMPORTANT]

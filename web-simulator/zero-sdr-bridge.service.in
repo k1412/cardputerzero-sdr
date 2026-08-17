@@ -1,0 +1,20 @@
+[Unit]
+Description=Zero SDR privacy-safe browser hardware bridge
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=@PROJECT_ROOT@
+Environment=ZERO_SDR_WEB_ROOT=@PROJECT_ROOT@/web-simulator
+Environment=ZERO_SDR_BRIDGE_PORT=18117
+ExecStart=@PROJECT_ROOT@/build/web-simulator/zero-sdr-bridge
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+
+[Install]
+WantedBy=default.target

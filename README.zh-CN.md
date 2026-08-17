@@ -8,6 +8,10 @@
 
 Zero SDR 是一款为 Cardputer Zero 打造的开源、键盘优先 RTL-SDR 接收机。界面以设备原生 320×170 分辨率渲染，并围绕实体 `F/X/Z/C`、Enter 和 Esc 按键设计。
 
+## 在线产品验收模拟器
+
+[打开中文浏览器模拟器](https://zero-sdr-simulator.k1412.top/)，可按照公开的 Cardputer Zero 外观与 46 键布局操作 320×170 界面、切换产品状态并填写验收意见。当前“真实 RTL-SDR”场景连接开发机上的 USB 接收器，提供实时频谱以及频率/增益控制；浏览器音频尚未串流。该链路用于产品设计验收，不替代实体 Cardputer Zero 的 P0 发布验证。
+
 ![无线电频谱与瀑布图](screenshots/radio-dark.png)
 
 > [!IMPORTANT]

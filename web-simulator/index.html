@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071018">
+  <meta name="description" content="Zero SDR 浏览器交互模拟器，用于 Cardputer Zero 产品设计验收。">
+  <title>Zero SDR · 产品验收模拟器</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#simulator">跳到模拟器</a>
+
+  <header class="site-header">
+    <a class="brand" href="#simulator" aria-label="Zero SDR 模拟器首页">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <span>ZERO SDR</span>
+    </a>
+    <div class="header-meta">
+      <span class="status-dot" id="global-live-status"><i></i>正在连接真机</span>
+      <a href="https://github.com/k1412/cardputerzero-sdr" target="_blank" rel="noreferrer">查看源码 ↗</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="intro" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">CARDPUTER ZERO / PRODUCT REVIEW</p>
+        <h1 id="page-title">把产品握在手里，<br><em>再决定哪里要改。</em></h1>
+      </div>
+      <div class="intro-copy">
+        <p>这是与 ARM64 应用交互模型同步的浏览器模拟器。你可以操作实体键、切换故障场景，并复制带状态的验收反馈。</p>
+        <p class="simulation-note">“真实 RTL-SDR”场景连接当前 USB 设备，实时传输射频频谱并控制频率与增益；浏览器音频暂未串流。其余场景用于可复现的产品设计和故障体验评审。</p>
+      </div>
+    </section>
+
+    <section class="workspace" id="simulator" aria-label="Zero SDR 交互模拟器">
+      <div class="device-area">
+        <div class="device-wrap">
+          <div class="device-topline">
+            <span>ZERO / 01</span>
+            <span>320 × 170 NATIVE</span>
+          </div>
+
+          <div class="device" aria-label="依据公开产品资料绘制的 Cardputer Zero 模拟设备">
+            <div class="display-deck">
+              <div class="left-pod" aria-hidden="true">
+                <strong>M5</strong>
+                <span>CARDPUTER<br><b>ZERO</b></span>
+                <small>Hold to<br>TALK</small>
+                <button class="pod-key" data-key="escape" type="button" tabindex="-1"></button>
+              </div>
+              <div class="screen-bezel">
+              <div class="screen is-dark locale-zh-CN" id="device-screen" tabindex="0" aria-label="Zero SDR 屏幕，点击后可使用键盘操作">
+                <div class="titlebar">
+                  <span class="app-title">Zero SDR</span>
+                  <span class="system-status" aria-label="Wi-Fi、网络、电池和时间">
+                    <span class="wifi" aria-hidden="true"></span>
+                    <span class="network" aria-hidden="true">↕</span>
+                    <span class="battery" aria-hidden="true"><i></i></span>
+                    <span class="battery-value">100%</span>
+                    <span class="clock">23:30</span>
+                  </span>
+                </div>
+
+                <div class="radio-page" id="radio-page">
+                  <div class="frequency-line">
+                    <span class="frequency" id="frequency">97.400</span>
+                    <span class="unit">MHz</span>
+                    <span class="mode-pill">WFM</span>
+                    <span class="source-pill" id="source-pill">演示</span>
+                  </div>
+                  <div class="radio-meta">
+                    <span id="gain-label">自动增益</span>
+                    <span id="step-label">200 kHz</span>
+                    <span class="audio-warning" id="audio-warning"></span>
+                  </div>
+                  <canvas id="spectrum" width="632" height="138" aria-label="模拟频谱与瀑布图"></canvas>
+                  <div class="direct-panel" id="direct-panel" hidden>
+                    <span class="direct-title" id="direct-title">输入 MHz</span>
+                    <span class="direct-value" id="direct-value">103.9_</span>
+                    <span class="direct-hint" id="direct-hint">ENT 选择 / ESC 返回</span>
+                  </div>
+                </div>
+
+                <div class="settings-page" id="settings-page" hidden>
+                  <div class="setting-row selected" data-row="0"><span data-setting-label="language">语言</span><b id="setting-language">简体中文</b></div>
+                  <div class="setting-row" data-row="1"><span data-setting-label="theme">主题</span><b id="setting-theme">深色</b></div>
+                  <div class="setting-row" data-row="2"><span data-setting-label="gain">增益</span><b id="setting-gain">自动增益</b></div>
+                  <div class="setting-row" data-row="3"><span data-setting-label="audio">音频</span><b id="setting-audio">开</b></div>
+                </div>
+
+                <div class="navbar">
+                  <span id="hint-left">F/X 步进</span>
+                  <span id="hint-center">Z/C 调谐</span>
+                  <span id="hint-right">ENT 菜单</span>
+                </div>
+              </div>
+              </div>
+              <div class="right-pod" aria-hidden="true">
+                <span class="power-switch"><i></i><b>ON</b></span>
+                <small>POWER<br>SWITCH</small>
+                <span class="usb-port"></span>
+                <small>USB-C<br><b>5V CHG</b></small>
+                <span class="pod-nav"><i>HOME</i><i>NEXT</i></span>
+              </div>
+            </div>
+
+            <div class="keyboard" aria-label="模拟实体按键">
+              <div class="key-row key-row-11">
+                <button class="key" data-key="1"><small>!</small><span>1</span></button>
+                <button class="key" data-key="2"><small>@</small><span>2</span></button>
+                <button class="key" data-key="3"><small>#</small><span>3</span></button>
+                <button class="key" data-key="4"><small>$</small><span>4</span></button>
+                <button class="key" data-key="5"><small>%</small><span>5</span></button>
+                <button class="key" data-key="6"><small>^</small><span>6</span></button>
+                <button class="key" data-key="7"><small>&amp;</small><span>7</span></button>
+                <button class="key" data-key="8"><small>*</small><span>8</span></button>
+                <button class="key" data-key="9"><small>(</small><span>9</span></button>
+                <button class="key" data-key="0"><small>)</small><span>0</span></button>
+                <button class="key" data-key="backspace"><small>DEL</small><span>←</span></button>
+              </div>
+              <div class="key-row key-row-11">
+                <button class="key"><small>ALT</small><span>TAB</span></button>
+                <button class="key"><span>Q</span></button><button class="key"><span>W</span></button><button class="key"><span>E</span></button><button class="key"><span>R</span></button>
+                <button class="key" data-key="t"><small>THEME</small><span>T</span></button>
+                <button class="key"><span>Y</span></button><button class="key"><span>U</span></button><button class="key"><span>I</span></button><button class="key"><span>O</span></button><button class="key"><span>P</span></button>
+              </div>
+              <div class="key-row key-row-11">
+                <button class="key"><small>CASE</small><span>Aa</span></button>
+                <button class="key"><span>A</span></button><button class="key"><span>S</span></button><button class="key"><span>D</span></button>
+                <button class="key action-key" data-key="up"><small>UP</small><span>F</span></button>
+                <button class="key" data-key="g"><small>GAIN</small><span>G</span></button>
+                <button class="key"><span>H</span></button><button class="key"><span>J</span></button><button class="key"><span>K</span></button>
+                <button class="key" data-key="l"><small>LANG</small><span>L</span></button>
+                <button class="key action-key" data-key="enter"><small>OK</small><span>↵</span></button>
+              </div>
+              <div class="key-row key-row-12">
+                <button class="key modifier"><span>fn</span></button><button class="key modifier"><span>ctrl</span></button>
+                <button class="key action-key" data-key="left"><small>LEFT</small><span>Z</span></button>
+                <button class="key action-key" data-key="down"><small>DOWN</small><span>X</span></button>
+                <button class="key action-key" data-key="right"><small>RIGHT</small><span>C</span></button>
+                <button class="key"><span>V</span></button><button class="key"><span>B</span></button><button class="key"><span>N</span></button>
+                <button class="key" data-key="m"><small>MUTE</small><span>M</span></button>
+                <button class="key"><span>,</span></button>
+                <button class="key" data-key="decimal"><small>POINT</small><span>.</span></button>
+                <button class="key space-key"><span>—</span></button>
+              </div>
+            </div>
+            <div class="device-footer"><span>PUBLIC PRODUCT REFERENCE</span><span>46-KEY LAYOUT · 1.9&quot; DISPLAY</span></div>
+          </div>
+        </div>
+
+        <div class="keyboard-help">
+          <span><kbd>F/X</kbd> 上下</span>
+          <span><kbd>Z/C</kbd> 左右</span>
+          <span><kbd>ENT</kbd> 确认</span>
+          <span><kbd>ESC</kbd> 返回</span>
+          <span>也支持方向键和数字键</span>
+        </div>
+        <p class="public-reference">外观与硬件标注依据 <a href="https://shop.m5stack.com/pages/m5-cardputerzero" target="_blank" rel="noreferrer">M5Stack 官方公开产品页</a>；屏幕与交互依据 <a href="https://github.com/k1412/cardputerzero-sdr" target="_blank" rel="noreferrer">公开项目仓库</a>。</p>
+      </div>
+
+      <aside class="control-panel" aria-labelledby="control-title">
+        <div class="panel-head">
+          <div>
+            <p class="panel-index">CONTROL / 02</p>
+            <h2 id="control-title">验收控制台</h2>
+          </div>
+          <button class="icon-button" id="reset-button" type="button" title="恢复默认状态" aria-label="恢复默认状态">↺</button>
+        </div>
+
+        <div class="control-group">
+          <label for="scenario">接收场景</label>
+          <select id="scenario">
+            <option value="device">真实 RTL-SDR（当前设备）</option>
+            <option value="demo">离线演示</option>
+            <option value="live">实时接收</option>
+            <option value="connecting">正在连接</option>
+            <option value="missing">未连接设备</option>
+            <option value="access">USB 权限不足</option>
+            <option value="busy">设备被占用</option>
+            <option value="error">设备错误</option>
+            <option value="noaudio">无音频</option>
+          </select>
+        </div>
+
+        <div class="control-grid">
+          <div class="control-group">
+            <label for="locale">界面语言</label>
+            <select id="locale"></select>
+          </div>
+          <div class="control-group">
+            <label for="theme">显示主题</label>
+            <select id="theme">
+              <option value="dark">深色</option>
+              <option value="light">浅色</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="control-group">
+          <span class="group-label">快速页面</span>
+          <div class="segmented" role="group" aria-label="快速页面切换">
+            <button type="button" data-page="radio" class="active">无线电</button>
+            <button type="button" data-page="settings">设置</button>
+            <button type="button" data-page="direct">直接调谐</button>
+          </div>
+        </div>
+
+        <dl class="state-readout" aria-label="当前模拟状态">
+          <div><dt>频率</dt><dd id="readout-frequency">97.400 MHz</dd></div>
+          <div><dt>步进</dt><dd id="readout-step">200 kHz</dd></div>
+          <div><dt>增益</dt><dd id="readout-gain">自动</dd></div>
+          <div><dt>音频</dt><dd id="readout-audio">开启</dd></div>
+          <div><dt>设备链路</dt><dd id="readout-device">正在连接</dd></div>
+          <div><dt>IQ 数据</dt><dd id="readout-iq">0 B</dd></div>
+        </dl>
+
+        <div class="event-log" aria-live="polite">
+          <span class="group-label">最近操作</span>
+          <p id="event-message">模拟器已就绪，按下任意实体键开始。</p>
+        </div>
+
+        <button class="primary-button" id="copy-link" type="button">复制当前状态链接</button>
+      </aside>
+    </section>
+
+    <section class="review" aria-labelledby="review-title">
+      <div class="review-intro">
+        <p class="eyebrow">REVIEW / 03</p>
+        <h2 id="review-title">产品验收记录</h2>
+        <p>勾选已经确认的项目，写下需要调整的地方。反馈只保存在当前浏览器，点击复制后可直接发给开发。</p>
+      </div>
+      <div class="review-form">
+        <fieldset class="checklist">
+          <legend>验收清单</legend>
+          <label><input type="checkbox" value="信息层级清楚"><span>信息层级清楚</span></label>
+          <label><input type="checkbox" value="320×170 下文字可读"><span>320×170 下文字可读</span></label>
+          <label><input type="checkbox" value="常用操作无需进入菜单"><span>常用操作无需进入菜单</span></label>
+          <label><input type="checkbox" value="故障提示可理解"><span>故障提示可理解</span></label>
+          <label><input type="checkbox" value="实体键映射符合直觉"><span>实体键映射符合直觉</span></label>
+        </fieldset>
+        <div class="notes-block">
+          <label for="review-notes">改进意见</label>
+          <textarea id="review-notes" rows="6" placeholder="例如：频率数字可以再大一点；USB 权限提示应该更直接……"></textarea>
+          <div class="review-actions">
+            <span id="save-status">自动保存在本机</span>
+            <button class="primary-button" id="copy-report" type="button">复制验收报告</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>ZERO SDR / BROWSER PRODUCT SIMULATOR</span>
+    <span>公开资料外观 · 真机射频链路 · 音频暂未串流</span>
+  </footer>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
